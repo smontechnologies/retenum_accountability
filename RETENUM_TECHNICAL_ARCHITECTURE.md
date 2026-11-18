@@ -21,7 +21,7 @@
 | TD-07 | **Domain logic as pure functions** (state machines, financial calculations) in `src/domain`, with no database or framework imports | Most important rules become fast, exhaustively testable unit tests | Logic spread across components |
 | TD-08 | **Money as `bigint` minor units + ISO currency** in the database, and `bigint` in TypeScript | No floating-point errors | Decimal or float |
 | TD-09 | **Append-only engagement events** with a database trigger rejecting UPDATE and DELETE, plus a per-engagement SHA-256 hash chain | Tamper-evident history (FR-HIS-02/03) enforced below the application | Application-only discipline |
-| TD-10 | **Payment provider abstraction** (`PaymentProvider` interface). **Paystack** is the first adapter | D-27; Stripe Connect can be added later | Hard-coding Paystack |
+| TD-10 | **Payment provider abstraction** (`PaymentProvider` interface). **Bachs** is the first adapter, built in the last slice (D-50) | D-27; Stripe Connect can be added later | Hard-coding Paystack |
 | TD-11 | **Webhook inbox pattern:** verify signature → store raw event (unique key) → process in a transaction with a row lock → state-machine guard | Idempotent, survives duplicates and out-of-order events | Processing directly in the handler without dedup |
 | TD-12 | **Transactional outbox for notifications.** Rows are written in the same transaction as the business action, sent after commit, and retried by cron | Notifications never lost and never roll back business actions | Sending email inside the request |
 | TD-13 | **Files in S3-compatible object storage** (Cloudflare R2) via short-lived pre-signed URLs. Local filesystem adapter in development | Cheap, no bandwidth charges, private by default | Database blobs |
@@ -50,7 +50,7 @@ retenum/                         (repository root = app/)
       modules/   identity, workspaces, engagements, changes, deliveries,
                  finance, payments, disputes, closure, notifications, files, admin
                  (each: service.ts = use-cases; queries.ts; validation.ts)
-      payments/  provider.ts (interface)  paystack/  registry.ts
+      payments/  provider.ts (interface)  fake/ (tests)  bachs/ (last slice)  registry.ts
       events/    append-only event writer (hash chain)
       outbox/    enqueue + dispatcher
       lib/       env.ts (validated), logger.ts, errors.ts, ids.ts, rate-limit.ts
@@ -124,7 +124,7 @@ Payer ──► Retenum server: initiate(obligation, amount)
             │ create payment_transaction(initiated, RTN-ref)  [tx]
             │ provider.initialize(ref, amount, currency, subaccount, callback)
             └──► redirect to provider-hosted checkout
-Provider ──► POST /api/webhooks/paystack   (raw body)
+Provider ──► POST /api/webhooks/bachs   (raw body)
             1 verify HMAC-SHA512(raw, secret) — constant-time        → 401 if bad
             2 INSERT provider_events (provider, event_key) ON CONFLICT DO NOTHING
                → already present? return 200 (duplicate)
@@ -146,14 +146,17 @@ Cron  ──► re-verify pending > 30 min; daily reconcile last 7 days
 - `refund(reference, amount?)` (GATED)
 - `listBanks()`
 
-**Paystack specifics (to be verified in the sandbox in Slice 7; current information comes from docs and third-party guides):**
-- Signature header `x-paystack-signature` = hex HMAC-SHA512 of the raw body, keyed with the secret key.
-- Verify via `GET /transaction/verify/:reference`.
-- Amounts are in kobo.
-- Subaccount via `subaccount` on initialize, with `bearer` configuration.
-- No failed-charge webhook, so rely on re-verification (D-28).
-- `refund.*` events for the refund lifecycle.
-- The event key for dedup = event type + `data.id` (transaction or refund id). To be confirmed against real payloads.
+**Bachs specifics.** From [docs.bachs.io](https://docs.bachs.io), read 18 Nov 2026. Everything marked *verify* must be confirmed in the sandbox and API reference in the last slice before any code depends on it.
+- Sandbox base URL `https://sandbox-api.bachs.io` with `sk_sandbox_` keys; live `https://api.bachs.io`; hosted checkout `https://checkout.bachs.io`.
+- **Connect sub accounts:** Retenum creates one per payee workspace; payees do not sign up to Bachs themselves. Onboarding is via a hosted link or the API, and each capability goes live when its checks pass. Retenum's platform account needs the `connect` capability, and production Connect requires Bachs business compliance (G-PAY 3).
+- **Charge shape: "direct".** Requests are made as the sub account (`X-Account-Id` header), so the sale, refunds and lost disputes belong to the payee's account. The sub account needs the payment-method capability (e.g. `card_collection`, `bank_transfer`). "Destination" charges (`transfer_data.destination`) are **not used**, because they put refunds and disputes on Retenum's balance.
+- Each account holds one balance per currency. Transfers never take a balance below zero except for a lost dispute. Funds already withdrawn cannot be pulled back.
+- **Payouts:** withdrawals to bank accounts and local rails; automatic payout schedules exist (*verify* that they apply to sub accounts and can target the sub account's own bank).
+- **Refunds:** a third-party plugin reports one refund operation per charge (*verify*).
+- **Webhooks:** signed (signature scheme, header name and event names to *verify*). The CLI supports `bachs listen --forward-to` and `bachs trigger collection.succeeded` for local testing.
+- **Amount format:** *verify* in the API reference (the docs page contained conflicting hints). The adapter converts to and from our `bigint` minor units at the boundary, so nothing else in the app is affected.
+- SDKs exist for Node.js, Python and Go. Prefer direct HTTP calls via `fetch` unless the SDK is mature, to keep the dependency surface small (*decide* in the slice).
+- **Restricted control (D-29a, FR-PAY-16):** the adapter implements no generic transfer. Only direct charges, retrieval, gated refunds, sub-account onboarding and withdrawal to the payee's own bank account are allowed.
 
 **Rules:**
 - Card data never touches Retenum.
@@ -194,9 +197,9 @@ The trigger rejects UPDATE and DELETE. A verification function recomputes the ch
 
 | Env | App | DB | Payments | Email | Files |
 |---|---|---|---|---|---|
-| local | `next dev` | PGlite file in `.data/` | Paystack **test** keys (optional) | console | local disk |
-| test (CI) | Vitest | PGlite in-memory, migrations applied | fake provider for unit tests; real Paystack sandbox tests run **only** when `PAYSTACK_TEST_SECRET_KEY` is set (reported as skipped otherwise) | in-memory | in-memory |
-| staging | Vercel preview | Neon branch | Paystack test | Resend (test domain) | R2 staging bucket |
+| local | `next dev --webpack` | PGlite file in `../.data/` | fake provider; Bachs **sandbox** keys from the last slice | console / file | local disk |
+| test (CI) | Vitest | PGlite in-memory, migrations applied | fake provider for unit tests; real Bachs sandbox tests run **only** when `BACHS_SANDBOX_SECRET_KEY` is set (reported as skipped otherwise) | in-memory | in-memory |
+| staging | Vercel preview | Neon branch | Bachs sandbox | Resend (test domain) | R2 staging bucket |
 | production | Vercel production | Neon main | test until G-PAY, then live | Resend | R2 prod bucket |
 
 - **Deployment:** `main` → production, after the CI pipeline (typecheck, lint, unit + integration tests, build). Migrations run as a deploy step (`drizzle-kit migrate`) before the new version serves traffic. Migrations must be backward-compatible with the previous release (expand/contract).
@@ -231,7 +234,7 @@ The trigger rejects UPDATE and DELETE. A verification function recomputes the ch
 |---|---|---|
 | Unit | Domain state machines (every allowed and forbidden transition), financial calculations (PRD §22 examples + property-style cases), money, working days, hash chain | Vitest |
 | Integration | Services against PGlite with real migrations: permissions, transactions, append-only trigger, idempotent webhook processing, outbox | Vitest |
-| Provider contract | Paystack adapter against recorded fixtures. Live sandbox suite when keys are present | Vitest |
+| Provider contract | Bachs adapter against recorded fixtures. Live sandbox suite when keys are present | Vitest |
 | End-to-end | Key journeys UJ-1 to UJ-9 in a browser (mobile + desktop viewports) | Playwright (from Slice 3) |
 | Accessibility | axe checks in e2e | @axe-core/playwright |
 
@@ -244,4 +247,5 @@ Rules:
 | Date | Change |
 |---|---|
 | 2026-11-18 | Created |
+| 2026-11-18 | Payment provider switched from Paystack to Bachs (direct charges on Connect sub accounts); provider integration moved to the last slice (D-50) |
 | 2026-11-18 | Slice 1 findings: `next dev` runs with `--webpack` (Turbopack dev reload loop on macOS 13/Node 22.11); local data lives in `../.data` outside `app/`; e2e uses Playwright driving installed Chrome (bundled Chromium unsupported on macOS 13); dev/e2e email adapter writes JSON lines to a file and is refused in production; Tailwind pinned to 4.2.4 until Node ≥ 22.12 |

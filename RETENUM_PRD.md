@@ -1,6 +1,6 @@
 # Retenum — Product Requirements Document (MVP)
 
-*Version 0.1 · 18 November 2026 · Status: draft for build. Decisions referenced as D-xx are in `RETENUM_PRODUCT_DECISIONS.md`, risks as R-xx in `RETENUM_RISK_REGISTER.md`. No customer validation has happened yet (D-00). Every requirement marked **[H]** rests on an untested hypothesis.*
+*Version 0.2 · 18 November 2026 (payment provider: Bachs; provider integration built last) · Status: draft for build. Decisions referenced as D-xx are in `RETENUM_PRODUCT_DECISIONS.md`, risks as R-xx in `RETENUM_RISK_REGISTER.md`. No customer validation has happened yet (D-00). Every requirement marked **[H]** rests on an untested hypothesis.*
 
 **Priority (MoSCoW):** **M** = must have for design-partner release · **S** = should have before general release · **C** = could have · **W** = won't have in the MVP.
 **Requirement IDs** are stable. Code and tests reference them (e.g. `FR-CHG-04`).
@@ -100,7 +100,7 @@ B2B SaaS. The initiating workspace pays a subscription priced by active engageme
 - Disputes as status.
 - Financial statement.
 - Payment requests.
-- Provider payments (Paystack; test mode until G-PAY).
+- Provider payments through Bachs (**built last**, D-50; sandbox until G-PAY).
 - Off-platform payments with confirmation.
 - Refund recording.
 - Timeline and export.
@@ -148,7 +148,7 @@ B2B SaaS. The initiating workspace pays a subscription priced by active engageme
 
 **UJ-4 Delivery and partial acceptance:** Tunde submits "3 concepts" with files. Ngozi **partially accepts**: 2 of 3 accepted, 1 needs correction. The concepts payment obligation becomes due pro-rata (2/3 of 30%). Tunde resubmits the third concept → accepted → the remainder becomes due.
 
-**UJ-5 Pay through the provider:** Ngozi opens the due obligation → **Pay ₦X** → Paystack hosted checkout (test mode before G-PAY) → returns to Retenum, which shows "Payment processing." The webhook arrives and server verification confirms it → **Paid**. Both parties are notified.
+**UJ-5 Pay through the provider:** Ngozi opens the due obligation → **Pay ₦X** → Bachs hosted checkout (sandbox before G-PAY) → returns to Retenum, which shows "Payment processing." The webhook arrives and server verification confirms it → **Paid**. Both parties are notified.
 
 **UJ-6 Off-platform payment:** Femi pays by bank transfer. Ngozi records "₦480,000 transfer, 12 Feb, ref 0034…" against the deposit → **Reported, awaiting confirmation**. Ada confirms receipt → **Paid**. If Ada says it was not received, it shows **"Payee reports not received,"** visible to both.
 
@@ -267,11 +267,12 @@ B2B SaaS. The initiating workspace pays a subscription priced by active engageme
 | FR-PAY-05 | Out-of-order events: status moves only forward along allowed transitions (§23). Late or older events are recorded but don't reverse a later state | M |
 | FR-PAY-06 | Pending transactions older than 30 minutes are re-verified. If the provider reports them unsuccessful or not found, they become `abandoned` or `failed` | M |
 | FR-PAY-07 | Amount mismatch (provider amount ≠ initiated amount) → the transaction becomes `needs_review`, is not counted as paid, and an admin alert is raised | M |
-| FR-PAY-08 | **Settlement destination:** the payee workspace's payout bank account is registered with the provider as a subaccount, and payments split 100% (less provider fees) to the subaccount (D-23). **GATED: G-PAY for live mode** | M (test mode) |
-| FR-PAY-09 | Payee payout setup: bank, account number and account name verified through the provider's resolve endpoint before creating the subaccount. The payee must confirm the resolved name | M |
+| FR-PAY-08 | **Settlement destination:** each payee workspace has a Bachs **sub account**, created by Retenum through hosted onboarding. Charges use the **direct** shape, so the sale (and any refund or lost dispute) belongs to the payee's sub account (D-23). The balance is withdrawn only to the payee's own verified bank account on an automatic schedule (D-29a). **GATED: G-PAY for live mode** | M (sandbox) |
+| FR-PAY-09 | Payee payout setup uses Bachs hosted onboarding for the sub account's details and payout bank account. The payee must see and confirm the bank account name before payouts are enabled. Retenum stores only the provider account id and the last 4 digits | M |
+| FR-PAY-16 | The payment adapter exposes only: create direct charge, retrieve charge, refund (gated), create or onboard sub account, and withdraw to the payee's verified bank account. **No transfer from a payee balance to any other destination** exists in the code (D-29a). An automated test asserts this | M |
 | FR-PAY-10 | **Off-platform payments:** a payer approver records amount, date, method, reference and an optional proof file against one or more obligations → `reported`. A payee approver confirms → `confirmed` (counts as paid) or rejects with a reason → `not_received` (not paid, visible) | M |
 | FR-PAY-11 | **Refunds:** provider refund events (`refund.processed`, `refund.failed`, etc.) are recorded as refund records linked to the transaction. Processed refunds reduce "paid." Off-platform refunds are recorded by the payee and confirmed by the payer | M |
-| FR-PAY-12 | In-app refund initiation by the payee (full or partial) through the provider | S, GATED (D-26) |
+| FR-PAY-12 | In-app refund initiation by the payee (full or partial) through the provider. Because Bachs reportedly allows one refund operation per charge, the UI warns that a partial refund closes further refunds on that charge | S, GATED (D-26) |
 | FR-PAY-13 | Reconciliation job (daily): verifies every non-final transaction from the last 7 days and flags differences between provider and Retenum | M |
 | FR-PAY-14 | Live mode can be switched on **only** via server configuration by a platform admin, after the G-PAY checklist is recorded as complete | M |
 | FR-PAY-15 | Payee-supplied external payment link on a payment request (D-29 fallback) | C |
@@ -439,12 +440,12 @@ All amounts are in minor units. "Confirmed" means confirmed under the rules abov
 **Provider transaction states:** `initiated` → `pending` → `succeeded` | `failed` | `abandoned` | `needs_review`. After success: `partially_refunded` → `refunded`. Allowed transitions only. Terminal states never move back.
 
 **Initiation (FR-PAY-02)**
-1. Server checks: the actor is payer side, the obligation is open, the amount is valid, the provider is configured, and the payee has a verified payout subaccount (or test-mode equivalent).
+1. Server checks: the actor is payer side, the obligation is open, the amount is valid, the provider is configured, and the payee has an active Bachs sub account with collection enabled (sandbox before G-PAY).
 2. Create the transaction (`initiated`, reference `RTN-<ulid>`).
-3. Call provider initialize with amount, currency, reference, subaccount, callback URL and metadata (engagement id, obligation ids). On a provider error the transaction is `failed`, with an error message.
+3. Create a Bachs checkout session as the payee's sub account (direct shape), with amount, currency, Retenum reference, return URL and metadata (engagement id, obligation ids). On a provider error the transaction is `failed`, with an error message.
 4. Redirect to the provider-hosted checkout. Status → `pending` once initialize succeeds.
 
-**Confirmation:** Webhook → verify signature (HMAC-SHA512 for Paystack, constant-time comparison) → store the raw event (dedup) → call the provider verify endpoint with the reference → compare amount, currency and reference → transition the state → write the event → notify both sides. The return page polls Retenum's own status.
+**Confirmation:** Webhook → verify the signature using the scheme in Bachs' webhook reference (constant-time comparison; scheme to be confirmed, O-08) → store the raw event (dedup) → retrieve the charge from the provider API → compare amount, currency and reference → transition the state → write the event → notify both sides. The return page polls Retenum's own status.
 
 **Off-platform:** see FR-PAY-10.
 
@@ -517,8 +518,8 @@ Notifications are sent via an **outbox** (reliable retries). Failures never roll
 | ID | Dependency | Blocks |
 |---|---|---|
 | LEG-01 | Nigerian legal opinion on the payment structure (G-PAY 1) | Live payments |
-| LEG-02 | Paystack written confirmation of the liability model (G-PAY 2) | Live payments, in-app refunds |
-| LEG-03 | Retenum entity + activated Paystack business account (G-PAY 3) | Live payments |
+| LEG-02 | Bachs written confirmation of its licensing, merchant of record, custody of sub-account balances and refund/chargeback liability (G-PAY 2) | Live payments, in-app refunds |
+| LEG-03 | Retenum entity + Bachs business compliance complete and Connect active in production (G-PAY 3) | Live payments |
 | LEG-04 | NDPA privacy compliance, hosting and transfer basis (G-PAY 4, O-03) | Production launch with real personal data |
 | LEG-05 | Terms of service and privacy notice: Retenum doesn't hold funds, guarantee payment, decide disputes, or make records legally binding (G-PAY 5) | Design-partner launch |
 | LEG-06 | Legal review of the governing-document clause, confirmation wording and retention periods | General release |
@@ -587,7 +588,7 @@ Each is written to be automated (Given / When / Then). The full test list lives 
 | Due date on a weekend | No adjustment (shown as is). Working days apply to response windows only |
 | Time zones | All deadlines computed in Africa/Lagos for the MVP |
 | Very large engagement (500+ commitments) | Paginated lists. Statement calculation must stay under 300 ms (index requirement) |
-| Provider subaccount bank details wrong | Payout setup requires the resolved-name confirmation (FR-PAY-09). Changing payout details requires owner re-authentication and notifies the counterparty on open engagements |
+| Payee sub-account bank details wrong | Payouts are enabled only after the payee confirms the bank account name (FR-PAY-09). Changing payout details requires owner re-authentication and notifies the counterparty on open engagements |
 
 ## 33. Risks and unresolved decisions
 
@@ -595,7 +596,7 @@ See `RETENUM_RISK_REGISTER.md` (top risks: R-C01 payer participation, R-L01 paym
 
 ## 34. Release criteria
 
-**Design-partner release (test-mode payments, off-platform recording live):**
+**Design-partner release (no provider payments yet; off-platform recording live, D-50):**
 1. All **M** requirements implemented, with acceptance criteria automated and passing.
 2. Permission test suite (AC-PERM-1) passing. Security review checklist (architecture §12) complete.
 3. Terms and privacy notice in place (LEG-05).
@@ -603,6 +604,6 @@ See `RETENUM_RISK_REGISTER.md` (top risks: R-C01 payer participation, R-L01 paym
 5. Error monitoring and payment alerts wired.
 6. At least 3 design-partner engagement pairs recruited, with consent to collect §30 metrics.
 
-**Live payments:** G-PAY complete and recorded (D-20), live keys in production only, end-to-end live test with a small real transaction and refund, reconciliation job verified.
+**Live payments** (the last slice, D-50): G-PAY complete and recorded (D-20), live keys in production only, end-to-end live test with a small real transaction and refund, reconciliation job verified.
 
 **General release:** Phase 3 decision is GO (or REVISE completed). **S** requirements done. LEG-06 complete.

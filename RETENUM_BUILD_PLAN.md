@@ -11,7 +11,7 @@ The work is a sequence of vertical slices: each one delivers working behaviour a
 
 1. **Counterparty invitation is merged with the engagement draft and baseline confirmation (Slice 2).** An invitation has no value without something to confirm. This also puts the riskiest assumption, whether payers take part (R-C01), in design partners' hands as early as possible.
 2. **Money primitives, the append-only event log and the outbox are built in Slice 0.** Every later slice writes history and notifications.
-3. **The payment abstraction and off-platform payments come before the Paystack integration (Slice 5 before 6).** The financial record and the provider-transaction model are designed once. The provider adapter plugs in later, and live activation is gated on G-PAY anyway.
+3. **The payment provider integration (Bachs) is the last slice** (founder decision D-50, 18 Nov 2026). The provider-neutral payment model, the webhook inbox table and a fake provider are still built in Slice 5, so the financial record never has to be reshaped when Bachs is added. The design-partner release (Slice 8) runs on off-platform payments confirmed by the payee.
 4. **Delivery comes before finance (Slice 4 before 5).** "Due on acceptance" needs acceptance to exist.
 5. **Disputes span slices.** Dispute status on changes and deliveries arrives with those slices. Amount disputes arrive with finance (Slice 5). Closure and export get their own slice.
 
@@ -25,10 +25,10 @@ The work is a sequence of vertical slices: each one delivers working behaviour a
 | 3 | Changes: agreement, authorisation, valuation, versions | Not started | 5 d |
 | 4 | Delivery, evidence and acceptance; party obligations | Not started | 4 d |
 | 5 | Financial record, payment requests, off-platform payments, provider abstraction, amount disputes | Not started | 5 d |
-| 6 | Paystack sandbox integration (payout accounts, checkout, webhooks, re-verification, reconciliation, refund events) | Not started | 5 d |
-| 7 | Closure, stop notice, timeline, PDF export, dispute positions | Not started | 3 d |
-| 8 | Notifications completion, reminders, minimal admin and payment console | Not started | 4 d |
-| 9 | Production readiness and design-partner release | Not started | 4 d |
+| 6 | Closure, stop notice, timeline, PDF export, dispute positions | Not started | 3 d |
+| 7 | Notifications completion, reminders, minimal admin | Not started | 4 d |
+| 8 | Production readiness and design-partner release (off-platform payments) | Not started | 4 d |
+| 9 | **Bachs integration (last):** sub-account onboarding, checkout, signed webhooks, retrieval, re-verification, reconciliation, refund events, payment console, live guard | Not started | 5 d |
 | | **Total** | | **≈41 d** |
 
 ---
@@ -166,26 +166,7 @@ The work is a sequence of vertical slices: each one delivers working behaviour a
 - **Definition of done:** tests executed and passing.
 - **Releasable:** **yes. Design partners get a complete record without provider payments.**
 
-## Slice 6 — Paystack sandbox integration
-
-- **Objective:** real provider payments in **test mode**: payout setup (resolve → subaccount), checkout initialization, signed webhooks, verification, re-verification of pending payments, daily reconciliation, refund events, and the live-mode guard.
-- **User value:** UJ-5, UJ-9.
-- **Requirements:** FR-PAY-01…09, 11, 13, 14; PRD §23–24; AC-PAY-1…4.
-- **Dependencies:** Slice 5; **a Paystack test account and test keys from the founder (blocking)**.
-- **Frontend:** payout account setup (payee); Pay button and amount selection; return page that polls status; failure and abandoned messages.
-- **Backend:** the Paystack adapter; webhook route (raw body, HMAC); verify; cron jobs (re-verify, reconcile); amount-mismatch review queue.
-- **Database:** `payout_accounts`; G-PAY flag (config table).
-- **Security:** signature verification; secrets server-only; live guard (FR-PAY-14); rate limit on initiation.
-- **Testing:**
-  - contract tests on recorded payloads;
-  - **live sandbox tests** (run only with keys; otherwise reported as skipped): initialize → test card success; decline; abandoned; duplicate webhook replay; partial refund;
-  - every Paystack assumption in architecture §6 verified, with the findings recorded there.
-- **Acceptance criteria:** AC-PAY-1…4 against the sandbox.
-- **Definition of done:** sandbox suite executed and passing, with the architecture doc updated.
-- **Risks:** R-PAY03; R-L01 (live remains gated).
-- **Releasable:** yes, test mode only.
-
-## Slice 7 — Closure, stop notice, timeline, export
+## Slice 6 — Closure, stop notice, timeline, export
 
 - **Objective:** final account; closed-with-open-items; stop notice snapshot; full timeline filters; PDF export; dispute positions and resolution.
 - **Requirements:** FR-CLS-01…04; FR-HIS-04…06; FR-DSP-03; NOT-08/09.
@@ -193,14 +174,14 @@ The work is a sequence of vertical slices: each one delivers working behaviour a
 - **Testing:** closure state machine; snapshot correctness; late payment after closure updates the record; PDF contains every required section; hash-chain verification in export.
 - **Releasable:** yes.
 
-## Slice 8 — Notifications completion, reminders, admin
+## Slice 7 — Notifications completion, reminders, admin
 
-- **Objective:** all NOT-01…09 messages; working-day reminders; due and overdue notices; minimal admin (search, read-only view with access log, suspend, payment console, needs-review queue, re-verify, outbox dead letters).
+- **Objective:** all NOT-01…09 messages (NOT-07, provider payment success or failure, arrives with Slice 9); working-day reminders; due and overdue notices; minimal admin (search, read-only view with access log, suspend, plan change for design partners, outbox dead letters). The payment console arrives with Slice 9.
 - **Requirements:** FR-NOT (§25); FR-ADM-01…04, 07; AUD-02.
 - **Testing:** reminder scheduling with a fixed clock; admin access logged; admin cannot mutate records (permission tests).
 - **Releasable:** yes.
 
-## Slice 9 — Production readiness and design-partner release
+## Slice 8 — Production readiness and design-partner release
 
 - **Objective:** meet the PRD §34 design-partner release criteria.
 - **Work:**
@@ -215,7 +196,39 @@ The work is a sequence of vertical slices: each one delivers working behaviour a
   - production deploy;
   - integration suite against a Neon branch;
   - release checklist signed.
-- **Releasable:** design-partner production release (provider payments in test mode until G-PAY).
+- **Releasable:** design-partner production release, **without provider payments**. Payments are recorded off-platform and confirmed by the payee (D-22, D-50).
+
+## Slice 9 — Bachs payment integration (last)
+
+- **Objective:** real provider payments through Bachs, in the **sandbox** until G-PAY passes:
+  - payee sub-account creation and hosted onboarding (including payout bank confirmation);
+  - **direct** checkout sessions as the payee's sub account;
+  - signed webhooks and server-side charge retrieval;
+  - re-verification of pending payments and daily reconciliation;
+  - refund and dispute events;
+  - automatic payouts to the payee's own bank;
+  - payment console and needs-review queue in admin;
+  - the live-mode guard.
+- **User value:** UJ-5, UJ-9.
+- **Requirements:** FR-PAY-01…09, 11, 13, 14, 16; NOT-07; FR-ADM-04; PRD §23–24; AC-PAY-1…4; D-23, D-28, D-29a.
+- **Dependencies:** Slices 5 and 8; **a Bachs sandbox account with `sk_sandbox_` keys and the Connect capability (blocking, founder)**. Review of the Bachs API reference for the items marked *verify* in architecture §6 (O-08).
+- **Frontend:** payee "get paid online" onboarding; Pay button with amount selection; return page polling Retenum's own status; failure and abandoned messages; refund warning (one refund per charge, if confirmed).
+- **Backend:** the Bachs adapter behind `PaymentProvider` (restricted operations only, FR-PAY-16); webhook route (raw body, signature check per Bachs' scheme); retrieval; cron jobs (re-verify, reconcile); amount-mismatch review queue.
+- **Database:** `payout_accounts` → `provider_accounts` (provider account id, capability status, payout-bank last 4, mode); G-PAY flag (config table).
+- **Security:**
+  - signature verification;
+  - secrets server-only;
+  - live guard (FR-PAY-14);
+  - rate limit on initiation;
+  - a test that no code path transfers from a payee balance to any destination other than that payee's bank (D-29a).
+- **Testing:**
+  - contract tests on recorded sandbox payloads;
+  - **live sandbox tests** (run only with keys; otherwise reported as skipped): checkout success; decline; abandoned; duplicate and out-of-order webhook replay (`bachs trigger` / `bachs listen`); refund; payout to the sub account's bank;
+  - every *verify* item in architecture §6 confirmed, with findings recorded there.
+- **Acceptance criteria:** AC-PAY-1…4 against the Bachs sandbox.
+- **Definition of done:** sandbox suite executed and passing, with the architecture doc updated.
+- **Risks:** R-PAY03, R-PAY07 (provider assurance), R-L01 (live remains gated).
+- **Releasable:** yes, sandbox only until G-PAY.
 
 ---
 
@@ -286,7 +299,7 @@ The work is a sequence of vertical slices: each one delivers working behaviour a
 4. Failed submissions wiped typed values (React 19 form reset); the form now keeps non-secret values.
 
 **Known gaps (carried forward)**
-- Invitation **acceptance** is verified by integration tests, not yet in the browser suite (the free plan has 1 seat and there is no admin UI to change plans; add once admin tooling exists in Slice 8).
+- Invitation **acceptance** is verified by integration tests, not yet in the browser suite (the free plan has 1 seat and there is no admin UI to change plans; add once admin tooling (plan change) exists in Slice 7).
 - No ESLint yet. TOTP 2FA (FR-ID-08, S) and multi-workspace switcher polish (FR-WS-05, S) not built.
 - Better Auth's built-in rate limiting is enabled only in production and uses in-memory storage — must switch to database storage before running more than one server instance (R-S02).
 - CI has still never run (no remote).

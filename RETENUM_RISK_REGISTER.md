@@ -13,7 +13,8 @@
 |---|---|---|---|---|---|---|---|
 | R-C01 | **Payers don't participate.** They ignore invitations or don't respond, so the record is one-sided | 4 | 5 | 20 | Lightweight access (D-43). Neutral design (D-04). Slice 2 ships early to design partners. Measure activation and response rate (PRD §30). Phase 3 participation experiment | Payer activation <70% or response <70% after 4 weeks of design-partner use | F |
 | R-C02 | **No one pays.** Payees value it but won't pay; payers expect it free | 3 | 5 | 15 | Commitment tests (Phase 3 §11). Free tier limited to 1 active engagement. Convert design partners at test prices | <3 paid conversions by the end of the design-partner period | F |
-| R-L01 | **The payment structure is regulated or exposes Retenum to liability.** Paystack splits make Retenum the main account (merchant), so CBN collection rules and refund or chargeback liability may apply | 3 | 5 | 15 | Gate G-PAY (legal opinion + Paystack confirmation) before live. Off-platform recording first-class (D-22). Fallback D-29 | Negative or unclear legal opinion | Lg/F |
+| R-L01 | **The payment structure is regulated or exposes Retenum to liability.** With Bachs Connect, Retenum creates and owns the payee sub accounts, and funds sit in Bachs balances until withdrawn. That gives Retenum control over payee money, and CBN collection rules may apply | 3 | 5 | 15 | Gate G-PAY (legal opinion + written Bachs confirmation) before live. Direct charges only. Restricted adapter (D-29a, FR-PAY-16). Off-platform recording first-class (D-22). Fallback D-29. Provider integration built last (D-50) | Negative or unclear legal opinion | Lg/F |
+| R-PAY07 | **Bachs provider assurance:** licensing not stated publicly; young provider (see Payment section) | 3 | 5 | 15 | G-PAY item 2; provider abstraction; off-platform recording | Bachs cannot confirm licensing in writing | F/Lg |
 | R-P00 | **Building before validation** (D-00) wastes effort on the wrong market or workflow | 4 | 4 | 16 | Slice order puts the participation test first. Design-partner release is treated as the pilot. GO/REVISE/NO-GO still applies | Phase 3 REVISE or NO-GO signals | F |
 
 ## Product and commercial
@@ -47,7 +48,8 @@
 |---|---|---|---|---|---|---|
 | R-PAY01 | A payment is marked paid without the money arriving (fake redirect, forged webhook) | 2 | 5 | 10 | Signature + server verify + amount check (FR-PAY-03, AC-PAY-1/3/4) | E |
 | R-PAY02 | Duplicate or out-of-order webhooks corrupt state | 3 | 4 | 12 | Inbox dedup + row lock + forward-only state machine (TD-11) | E |
-| R-PAY03 | Paystack behaviour differs from third-party documentation (event keys, missing failure events, refund debits) | 3 | 3 | 9 | Verify every assumption in the sandbox in Slice 6. Record findings in the architecture doc | E |
+| R-PAY03 | Bachs behaviour differs from what the docs suggest (signature scheme, event names, amount format, sub-account payouts, one refund per charge) | 3 | 3 | 9 | Verify every item in architecture §6 in the sandbox in Slice 9. Record findings in the architecture doc | E |
+| R-PAY07 | **Provider assurance:** Bachs' licensing or regulatory status is not stated on its website, and it is a much younger provider than Paystack. Risks include settlement failure, sudden service changes, or regulatory action against the provider | 3 | 5 | 15 | Written confirmation of licensing and fund-holding arrangements (G-PAY 2). Provider abstraction (D-27) keeps a second adapter possible. Off-platform recording means the product works without the provider | F/Lg |
 | R-PAY04 | Payouts go to the wrong bank account | 2 | 5 | 10 | Resolve and name confirmation (FR-PAY-09). Re-auth plus counterparty notice on change. Paystack disclaims liability for wrong account details | E/F |
 | R-PAY05 | Live keys are used before G-PAY | 2 | 5 | 10 | Double guard (FR-PAY-14). Separate environments | E |
 | R-PAY06 | Overpayment or race conditions create confusion | 3 | 2 | 6 | Credit display (FR-FIN-07). No auto-refunds | E |
@@ -72,11 +74,12 @@
 | R-O03 | Hosting outside Nigeria causes latency or data-transfer problems | 3 | 2 | 6 | Lightweight pages. Legal review of transfers (O-03) | E/Lg |
 | R-O04 | Email deliverability to Nigerian corporate domains | 3 | 3 | 9 | Authenticated domain (SPF/DKIM/DMARC). The in-app "awaiting response" list doesn't rely on email | E |
 | R-O05 | Scope creep delays design-partner release | 3 | 3 | 9 | MoSCoW discipline. W list in PRD §13 | F/E |
-| R-O06 | Dev environment diverges from production (webpack dev vs Turbopack build; Node 22.11 locally; Chrome-driven e2e) and hides bugs | 3 | 2 | 6 | Upgrade local Node to ≥22.12; run e2e against a production build in Slice 9; CI on Linux | E |
+| R-O06 | Dev environment diverges from production (webpack dev vs Turbopack build; Node 22.11 locally; Chrome-driven e2e) and hides bugs | 3 | 2 | 6 | Upgrade local Node to ≥22.12; run e2e against a production build in Slice 8; CI on Linux | E |
 
 ## Change log
 
 | Date | Change |
 |---|---|
 | 2026-11-18 | Created |
+| 2026-11-18 | Payment provider switched to Bachs: R-L01 and R-PAY03 rewritten; R-PAY07 (provider assurance, score 15) added |
 | 2026-11-18 | Added R-O06 (dev toolchain divergence). Updated R-S02 note: Better Auth rate-limit storage is in-memory until moved to DB |
