@@ -1,0 +1,26 @@
+import path from "node:path";
+import type { NextConfig } from "next";
+
+// Security headers (SEC-10). CSP is tightened further in Slice 9.
+const securityHeaders = [
+  { key: "X-Frame-Options", value: "DENY" },
+  { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
+  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+];
+
+const nextConfig: NextConfig = {
+  poweredByHeader: false,
+  // Pin the project root so a stray lockfile in a parent folder is never used.
+  turbopack: { root: path.resolve(import.meta.dirname) },
+  outputFileTracingRoot: path.resolve(import.meta.dirname),
+  // PGlite ships WASM and must not be bundled by the server compiler.
+  serverExternalPackages: ["@electric-sql/pglite"],
+  async headers() {
+    return [{ source: "/:path*", headers: securityHeaders }];
+  },
+};
+
+export default nextConfig;
