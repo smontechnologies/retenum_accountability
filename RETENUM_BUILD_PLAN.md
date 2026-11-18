@@ -15,13 +15,18 @@ The work is a sequence of vertical slices: each one delivers working behaviour a
 4. **Delivery comes before finance (Slice 4 before 5).** "Due on acceptance" needs acceptance to exist.
 5. **Disputes span slices.** Dispute status on changes and deliveries arrives with those slices. Amount disputes arrive with finance (Slice 5). Closure and export get their own slice.
 
+## Design quality gate (applies to every UI slice from 1A onward)
+
+A UI slice is only done when the design system §11 checklist passes: tokens and shared components only, light and dark verified with axe, no overflow at the six widths, deliberate mobile patterns, loading/empty/error/offline states, the status grammar, `MoneyFigure` for all money, and the journey tested end to end at mobile and desktop sizes.
+
 ## Progress summary
 
 | Slice | Name | Status | Effort (est.) |
 |---|---|---|---|
 | 0 | Foundation | ✅ Done (see log) | 3 d |
 | 1 | Identity and workspaces | ✅ Done (see log) | 3 d |
-| 2 | Engagement draft, counterparty invitation, baseline confirmation | ⏳ Next | 5 d |
+| 1A | **Design system, app shell, themes and PWA** (and Slice 1 screens brought up to the design system) | ⏳ Next | 4 d |
+| 2 | Engagement draft, counterparty invitation, baseline confirmation | Not started | 5 d |
 | 3 | Changes: agreement, authorisation, valuation, versions | Not started | 5 d |
 | 4 | Delivery, evidence and acceptance; party obligations | Not started | 4 d |
 | 5 | Financial record, payment requests, off-platform payments, provider abstraction, amount disputes | Not started | 5 d |
@@ -29,7 +34,7 @@ The work is a sequence of vertical slices: each one delivers working behaviour a
 | 7 | Notifications completion, reminders, minimal admin | Not started | 4 d |
 | 8 | Production readiness and design-partner release (off-platform payments) | Not started | 4 d |
 | 9 | **Bachs integration (last):** sub-account onboarding, checkout, signed webhooks, retrieval, re-verification, reconciliation, refund events, payment console, live guard | Not started | 5 d |
-| | **Total** | | **≈41 d** |
+| | **Total** | | **≈45 d** |
 
 ---
 
@@ -79,6 +84,39 @@ The work is a sequence of vertical slices: each one delivers working behaviour a
 - **Definition of done:** tests executed and passing; a manual run-through in the browser at a mobile width.
 - **Risks:** email delivery in development (console adapter).
 - **Releasable:** yes (staging).
+
+## Slice 1A — Design system, app shell, themes and PWA
+
+- **Objective:** a deliberate, consistent design foundation before any more screens are built. Everything later is built from these tokens and components.
+- **User value:** a professional, accessible product in light and dark themes, installable as an app, with honest offline behaviour.
+- **Requirements:** DES-01…12, PWA-01…08, NFR-01/02; design system §2–§11; UI/UX spec §1–§3, §7–§9.
+- **Dependencies:** Slice 1. `RETENUM_DESIGN_SYSTEM.md` and `RETENUM_UI_UX_SPECIFICATION.md` approved.
+- **Frontend:**
+  - tokens and themes;
+  - IBM Plex Sans;
+  - component library (Button, Field/Input/Select/Checkbox, Form, Alert, StatusBadge, MoneyFigure, LedgerStrip, PaymentSummary, Panel/Card, Table→stacked list, DescriptionList, Dialog/ConfirmDialog, Drawer, Tabs, EmptyState, Skeleton, ErrorState, Toast, ThemeSelect, Timeline);
+  - app shell (sidebar, icon rail, top bar, bottom nav, More sheet, workspace switcher);
+  - Overview, Engagements, Payments and Activity with honest empty states;
+  - Business (moved from `/app/w/[id]`);
+  - Settings → Appearance;
+  - restyled auth and invitation screens;
+  - offline page;
+  - offline and update banners;
+  - an internal component catalogue page (dev only) for visual review.
+- **Backend:** `user_preferences` table and theme service (set, read, copy to cookie at sign-in); current-workspace cookie and switcher; manifest; icon routes; service worker headers.
+- **Database:** `user_preferences`.
+- **Security:**
+  - the service worker never caches authenticated responses or non-GET requests;
+  - the service worker is served with `no-cache` and a strict CSP;
+  - the workspace cookie is validated against membership on every request.
+- **Testing:**
+  - unit: status taxonomy completeness (every PRD state has icon, label and style), money formatting and spoken labels, theme service;
+  - integration: preferences saved and restored;
+  - e2e: theme select persists on reload and on a second device (new browser context after sign-in); axe passes in light and dark on every shell page; no overflow at 320/390/768/1024/1280/1536; bottom nav on mobile and sidebar on desktop; manifest valid with icons reachable; service worker registers; offline navigation shows the offline page; submit disabled while offline.
+- **Acceptance criteria:** design quality gate (design system §11) passes for every screen in the slice.
+- **Definition of done:** all tests executed and passing; screenshots of key screens reviewed in both themes at 390 and 1280.
+- **Risks:** R-O06 (service worker behaviour in dev vs production); font download at build time.
+- **Releasable:** yes.
 
 ## Slice 2 — Engagement draft, counterparty invitation, baseline confirmation
 

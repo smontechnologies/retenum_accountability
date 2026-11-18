@@ -28,7 +28,13 @@
 | TD-14 | **Email through Resend** (HTTP API). A console adapter in development and tests | Simple API, good deliverability | Running our own email server |
 | TD-15 | **Hosting: Vercel** (app + cron) **+ Neon** (Postgres, EU region pending O-03) **+ R2 + Resend + Sentry** | Managed, low ops, free or cheap tiers to start | Self-managed VPS (ops burden) |
 | TD-16 | **Validation with Zod** at every boundary (forms, server actions, webhooks, env) | Single schema language | Ad hoc checks |
-| TD-17 | **Styling: Tailwind CSS.** Accessible primitives built in-house (forms, dialog, status badge) | Fast, consistent, mobile-first | A heavy component kit |
+| TD-17 | **Styling: Tailwind CSS v4 with semantic design tokens.** Tokens are CSS custom properties defined per theme in `globals.css` and mapped into Tailwind with `@theme inline`, so components use `bg-surface`, `text-fg-muted` and similar. A shared component library in `src/components/ui/` (design system §7). Raw colour values in components are forbidden | Consistency, both themes from one code path | Per-component colours; a heavy third-party kit whose look we'd have to fight |
+| TD-21 | **Themes via `data-theme` on `<html>`** (`light`, `dark`, `system`). The server renders the attribute from a `rtn_theme` cookie, so there's no flash. `system` resolves in CSS through `prefers-color-scheme`, with no JavaScript. Tailwind's `dark:` variant is bound to the resolved theme. The preference is also stored in a `user_preferences` table and copied into the cookie at sign-in (cross-device, DES-03) | No flash of the wrong theme, works without JS | `next-themes` (client-side, flashes without extra work) |
+| TD-22 | **IBM Plex Sans via `next/font/google`** (self-hosted at build, no runtime third-party requests) | Tabular figures, offline-safe, CSP-friendly | Runtime Google Fonts link |
+| TD-23 | **Icons: `lucide-react`**, pinned | Consistent outline set, tree-shaken | Hand-drawn SVGs |
+| TD-24 | **PWA without a framework plugin:** `app/manifest.ts`; icons generated with `next/og` `ImageResponse` routes; a hand-written `public/sw.js` (versioned cache, cache-first for `/_next/static` and icons, network-only for everything else, offline fallback `/offline`); a client registration component that offers updates when a new worker is waiting. Registered in production, or in development only when `NEXT_PUBLIC_ENABLE_SW=1` (used by e2e) | Full control over what is (not) cached. Financial pages are never cached | `next-pwa` or Serwist (more magic, less control over caching rules for sensitive pages) |
+| TD-25 | **`experimental.useOffline` is not enabled.** Its automatic replay of server actions after reconnecting conflicts with PWA-07 (commercial confirmations must never be sent later without the user knowing). Offline state comes from `navigator.onLine` and events, and blocks submission | Commercial integrity | Auto-retry |
+| TD-26 | **Accessibility checks with `@axe-core/playwright`** in both themes, plus overflow checks at six widths, in every UI slice | DES-09, DES-08 | Manual-only review |
 | TD-18 | **Testing: Vitest** (unit + integration against PGlite with real migrations). **Playwright** end-to-end from Slice 3. Table-driven permission tests | Fast feedback without Docker | Jest |
 | TD-19 | **CI: GitHub Actions** (typecheck, lint, test, build, dependency audit) once a remote exists | Standard | — |
 | TD-20 | **Exact dependency versions** pinned, with the lockfile committed | Reproducible builds | Version ranges |
@@ -39,7 +45,10 @@
 retenum/                         (repository root = app/)
   src/
     app/                         Next.js routes (UI, server actions, route handlers)
-      (auth)/  (app)/  api/webhooks/[provider]/  api/cron/[job]/  api/health/
+      (auth)/  app/  api/webhooks/[provider]/  api/cron/[job]/  api/health/  manifest.ts  offline/
+    components/
+      ui/                        design-system components (Button, Field, StatusBadge, MoneyFigure, LedgerStrip, …)
+      shell/                     Sidebar, BottomNav, TopBar, OfflineBanner, UpdateBanner
     domain/                      PURE logic: no DB, no framework
       money.ts  engagement-state.ts  change-state.ts  delivery-state.ts
       payment-state.ts  financials.ts  working-days.ts  hash-chain.ts
@@ -247,5 +256,6 @@ Rules:
 | Date | Change |
 |---|---|
 | 2026-11-18 | Created |
+| 2026-11-18 | Added TD-21…TD-26 (design tokens, themes, font, icons, PWA, no auto-retry offline, axe) for the visual design, UI/UX and PWA requirements |
 | 2026-11-18 | Payment provider switched from Paystack to Bachs (direct charges on Connect sub accounts); provider integration moved to the last slice (D-50) |
 | 2026-11-18 | Slice 1 findings: `next dev` runs with `--webpack` (Turbopack dev reload loop on macOS 13/Node 22.11); local data lives in `../.data` outside `app/`; e2e uses Playwright driving installed Chrome (bundled Chromium unsupported on macOS 13); dev/e2e email adapter writes JSON lines to a file and is refused in production; Tailwind pinned to 4.2.4 until Node ≥ 22.12 |

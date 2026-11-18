@@ -1,6 +1,6 @@
 # Retenum — Product Requirements Document (MVP)
 
-*Version 0.2 · 18 November 2026 (payment provider: Bachs; provider integration built last) · Status: draft for build. Decisions referenced as D-xx are in `RETENUM_PRODUCT_DECISIONS.md`, risks as R-xx in `RETENUM_RISK_REGISTER.md`. No customer validation has happened yet (D-00). Every requirement marked **[H]** rests on an untested hypothesis.*
+*Version 0.3 · 18 November 2026 (adds §16a visual design, UI/UX and PWA; payment provider: Bachs; provider integration built last) · Status: draft for build. Decisions referenced as D-xx are in `RETENUM_PRODUCT_DECISIONS.md`, risks as R-xx in `RETENUM_RISK_REGISTER.md`. No customer validation has happened yet (D-00). Every requirement marked **[H]** rests on an untested hypothesis.*
 
 **Priority (MoSCoW):** **M** = must have for design-partner release · **S** = should have before general release · **C** = could have · **W** = won't have in the MVP.
 **Requirement IDs** are stable. Code and tests reference them (e.g. `FR-CHG-04`).
@@ -321,7 +321,7 @@ See §29.
 
 | ID | Requirement | P |
 |---|---|---|
-| NFR-01 | Mobile-first responsive web app. Fully usable at 360 px width. Excellent at desktop widths | M |
+| NFR-01 | Mobile-first responsive progressive web app. Fully usable at 320 px width. Excellent at desktop widths (see DES-08, PWA-01…08) | M |
 | NFR-02 | Accessibility: WCAG 2.2 AA. Keyboard-operable. Statuses never conveyed by colour alone | M |
 | NFR-03 | Performance: server p95 under 500 ms for page data. Engagement page under 200 KB JavaScript on first load (target, for low-bandwidth users) | S |
 | NFR-04 | Availability target 99.5% monthly (design-partner phase) | S |
@@ -330,6 +330,33 @@ See §29.
 | NFR-07 | English UI. Number and currency formatting by locale (en-NG) | M |
 | NFR-08 | Observability: structured logs, error tracking, payment-event metrics | M |
 | NFR-09 | Separate development, staging (provider test mode) and production environments, with separate credentials | M |
+
+## 16a. Visual design, UI/UX and PWA requirements
+
+Binding detail: `RETENUM_DESIGN_SYSTEM.md` (tokens, components, status grammar, quality gate) and `RETENUM_UI_UX_SPECIFICATION.md` (information architecture, screens, patterns, offline).
+
+| ID | Requirement | P |
+|---|---|---|
+| DES-01 | Strictly monochrome identity: black, white and neutral greys only. No brand accent, gradients, decorative illustrations or heavy shadows | M |
+| DES-02 | Light, dark and system themes, user-selectable in Settings → Appearance | M |
+| DES-03 | Theme preference persists across sessions (cookie, no flash on first paint) and across devices (saved to the account, applied at sign-in) | M |
+| DES-04 | Semantic design tokens only. No raw colours in components | M |
+| DES-05 | Money shown with tabular figures, full precision and explicit currency, never colour-coded | M |
+| DES-06 | Statuses use the status grammar (icon + label + style). Agreement, authorisation, valuation, delivery, acceptance and payment are never merged into one indicator | M |
+| DES-07 | Shared component library (design system §7). Screens may not introduce one-off component styling | M |
+| DES-08 | Responsive layouts verified at 320, 390, 768, 1024, 1280 and 1536 px. Mobile uses bottom navigation, stacked tables and a reachable primary action. Desktop uses a persistent sidebar and the engagement right rail | M |
+| DES-09 | WCAG 2.2 AA in both themes, verified with automated axe checks in each UI slice | M |
+| DES-10 | Design quality gate (design system §11) is part of every UI slice's definition of done | M |
+| DES-11 | Information architecture: Overview, Engagements, Payments, Activity, Business, Settings. The engagement workspace has six sections (Overview, Agreement, Changes, Delivery, Payments, Activity) and a header showing name, other party, status, agreed value, paid and outstanding | M |
+| DES-12 | The Overview shows actionable information only (active engagements, due, outstanding, received, awaiting confirmation, changes awaiting authorisation, deliveries awaiting acceptance, recent activity), each item linking to its source. No decorative charts | M |
+| PWA-01 | Web app manifest, installable on supported mobile and desktop browsers, with icons (192, 512, maskable, Apple touch) and splash configuration | M |
+| PWA-02 | Service worker: cache-first for versioned static assets; network-only for pages, actions and APIs; offline fallback page | M |
+| PWA-03 | Network status banner (offline / back online) | M |
+| PWA-04 | Update handling: a waiting new version is offered with "Reload to update". No forced reloads | M |
+| PWA-05 | No caching of authenticated pages or financial data in the MVP. Balances are always computed by the server from verified records | M |
+| PWA-06 | While offline, no confirmation, payment or record can be submitted. Nothing is shown as complete before the server acknowledges it | M |
+| PWA-07 | No automatic queueing or replay of commercial actions after reconnecting (offline actions can never silently overwrite server records) | M |
+| PWA-08 | Installability and basic offline behaviour are covered by automated browser tests | M |
 
 ## 17. Permissions and access control
 
