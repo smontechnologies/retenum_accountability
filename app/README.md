@@ -12,7 +12,7 @@ dependency) and pnpm 10.
 ```bash
 pnpm install
 cp .env.example .env.local        # set BETTER_AUTH_SECRET (openssl rand -base64 32)
-pnpm db:migrate                   # creates the local embedded database in ./.data/pglite
+pnpm db:migrate                   # creates the local embedded database in ../.data/pglite (outside app/ on purpose)
 pnpm dev                          # http://localhost:3000  (health: /api/health)
 ```
 

@@ -20,8 +20,8 @@ The work is a sequence of vertical slices: each one delivers working behaviour a
 | Slice | Name | Status | Effort (est.) |
 |---|---|---|---|
 | 0 | Foundation | ✅ Done (see log) | 3 d |
-| 1 | Identity and workspaces | ⏳ Next | 3 d |
-| 2 | Engagement draft, counterparty invitation, baseline confirmation | Not started | 5 d |
+| 1 | Identity and workspaces | ✅ Done (see log) | 3 d |
+| 2 | Engagement draft, counterparty invitation, baseline confirmation | ⏳ Next | 5 d |
 | 3 | Changes: agreement, authorisation, valuation, versions | Not started | 5 d |
 | 4 | Delivery, evidence and acceptance; party obligations | Not started | 4 d |
 | 5 | Financial record, payment requests, off-platform payments, provider abstraction, amount disputes | Not started | 5 d |
@@ -223,5 +223,70 @@ The work is a sequence of vertical slices: each one delivers working behaviour a
 
 *Updated as work happens. Test results are pasted from actual runs.*
 
-### Slice 0 — Foundation
-*(see below; updated at completion)*
+### Slice 0 — Foundation: ✅ complete (18 Nov 2026, commit `1f0ba5e`)
+
+**Built**
+- Next.js 16 + TypeScript (strict) app in `app/`.
+- Validated environment config: production refuses to start without `DATABASE_URL` and a strong secret.
+- Structured logger, typed errors (internal details never leaked), IDs and secret tokens (hashed).
+- Drizzle schema + SQL migrations: Better Auth tables, `engagement_events`, `security_audit_log`, `outbox`.
+- **Database triggers rejecting UPDATE, DELETE and TRUNCATE** on both history tables.
+- Hash-chained event writer with chain verification.
+- Transactional outbox with retry, back-off and dead-lettering.
+- Better Auth (email + password, verification required, reset, sessions).
+- `/api/health`; security headers; mobile-first base layout; status badge primitive.
+- Domain primitives: money (bigint minor units, parsing, formatting, pro-rata), working-day deadlines (Lagos time, holidays), hash chain.
+- CI workflow (typecheck, test, build, audit).
+
+**Requirements satisfied (foundation level):** FR-FIN-06; FR-HIS-02; FR-HIS-03 (infrastructure); AC-HIS-1; FR-ID-01 (password length + hashing); FR-ID-02 (sign-in blocked until verified); SEC-03 (partial); SEC-06 (token generation); SEC-08 (env-only secrets); SEC-10 (headers, partial); NFR-06; NFR-09 (env separation, partial); TD-01…TD-20 (foundations).
+
+**Tests actually run**
+- `pnpm test`: **7 files, 43 tests, all passed**.
+  - Unit: money, working days, hash chain, env, IDs, errors.
+  - Integration on PGlite with real migrations: tables created; append-only triggers; event sequencing and per-engagement chains; rollback leaves no event; tamper detection after a simulated superuser bypass; outbox commit-only, single delivery, back-off, dead letter; auth sign-up hashing, unverified sign-in refused, verified sign-in, wrong password, short password, enumeration-safe duplicate sign-up.
+- `pnpm typecheck`: passed.
+- `pnpm build`: passed.
+- **Runtime smoke test (dev server):**
+  - `/api/health` → 200 `{"status":"ok"}`;
+  - sign-up → unverified user returned;
+  - sign-in before verification → `403 EMAIL_NOT_VERIFIED`;
+  - security headers present;
+  - `next start` without `DATABASE_URL` → health 503 with a clear configuration error (intended production guard).
+
+**Deviations and known issues**
+- **Local Node is 22.11.** Vite 8 (used by Vitest 5) wants 22.12 or later, so its macOS x64 native binding had to be added manually as a dev dependency, and Tailwind was pinned to 4.2.4 (4.3 needs `require(esm)` from Node 22.12). **Recommendation: upgrade local Node to 22.12+**, then remove the manual binding and unpin Tailwind.
+- ESLint is not configured yet; type checking is the only static check. Add it in Slice 1 or 9.
+- Duplicate sign-up returns a normal-looking response (Better Auth's enumeration protection when verification is required). Tested: no second account, original unchanged.
+- The CI workflow is committed, but no GitHub remote exists yet, so CI has never run.
+- `engagement_events.engagement_id` has no foreign key yet. It gets one in Slice 2.
+
+### Slice 1 — Identity and workspaces: ✅ complete (18 Nov 2026)
+
+**Built**
+- Registration, email verification (link), sign-in, sign-out, forgot/reset password (server actions over Better Auth, `nextCookies`).
+- Open-redirect-safe `next` parameter; identical message for unknown email and wrong password.
+- Workspaces (business/individual), membership roles, deny-by-default workspace policy matrix, invitations (hashed single-use tokens, 7-day expiry, email-bound acceptance, revocation).
+- Role change, removal, leave, ownership transfer; one-owner invariant enforced by a partial unique index; plan seat limits (pending invitations count); 20 invitations/hour per workspace; security audit log for every workspace and auth-relevant change.
+- Mobile-first, accessible pages: labelled fields, announced errors, text-based status badges, kept form values after failed submits (never passwords).
+- Email delivery: console / file (dev and e2e only) / Resend; production refuses non-Resend modes; outbox sent after each action and after auth API requests; `/api/cron/outbox` retry endpoint protected by `CRON_SECRET`.
+- Playwright end-to-end suite driving installed Chrome, mobile (Pixel 7) and desktop.
+
+**Requirements satisfied:** FR-ID-01, 02, 03, 04, 07 (production rate limit via Better Auth; invitation limit in service); FR-WS-01, 02, 03, 04, 06, 07 (seats; engagement limit applies from Slice 2); SEC-05 (partial), SEC-06; AUD-02 (workspace/auth events); PRD §17 workspace rows; NFR-01/02 (key pages).
+
+**Tests actually run**
+- `pnpm test`: **8 files, 88 tests, all passed**. Includes a 28-case workspace permission matrix; workspace creation (verified only, owner, audit, validation, non-members get NOT_FOUND); invitations (free-plan seat limit, token hashed, single use, wrong email refused, expired/revoked/invalid, duplicates, members cannot invite, pending counts toward seats); roles/removal/leave/transfer; database refuses a second owner; password reset end to end; reset does not reveal account existence; production email-mode guard.
+- `pnpm test:e2e` (Chrome 157): **8 passed** (4 scenarios × mobile and desktop): UJ-1 (validation messages → sign-up → unverified sign-in refused → anonymous redirect → verify via emailed link → create workspace → seat-limit message → owner cannot leave → sign out → wrong password message with email kept → sign in); password reset via emailed link; invalid invitation link; no horizontal scroll on key pages.
+- `pnpm typecheck` passed; `pnpm build` passed.
+- `pnpm audit --audit-level high`: no high/critical. One **moderate** advisory in esbuild via drizzle-kit (development tool only, not shipped).
+
+**Bugs found and fixed during verification**
+1. Turbopack dev server reload-looped (~10 full reloads/second) on this machine (macOS 13, Node 22.11), interrupting every form. Isolated by elimination (not data files, not config root); webpack dev mode does not loop. **`pnpm dev` and e2e now use `next dev --webpack`**; production build still uses Turbopack. Revisit after upgrading Node/macOS.
+2. Local data (`.data/`) moved outside `app/` (`../.data/`) so database/email writes never trigger dev reloads.
+3. Emails queued by direct auth API calls were only sent by cron; the auth route now sends after each request.
+4. Failed submissions wiped typed values (React 19 form reset); the form now keeps non-secret values.
+
+**Known gaps (carried forward)**
+- Invitation **acceptance** is verified by integration tests, not yet in the browser suite (the free plan has 1 seat and there is no admin UI to change plans; add once admin tooling exists in Slice 8).
+- No ESLint yet. TOTP 2FA (FR-ID-08, S) and multi-workspace switcher polish (FR-WS-05, S) not built.
+- Better Auth's built-in rate limiting is enabled only in production and uses in-memory storage — must switch to database storage before running more than one server instance (R-S02).
+- CI has still never run (no remote).

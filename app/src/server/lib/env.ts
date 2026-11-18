@@ -9,10 +9,14 @@ const EnvSchema = z
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
     APP_URL: z.url().default("http://localhost:3000"),
     DATABASE_URL: z.string().optional().transform((v) => (v ? v : undefined)),
-    PGLITE_DIR: z.string().default(".data/pglite"),
+    // Outside app/ so the dev server file watcher does not reload pages on every database write.
+    PGLITE_DIR: z.string().default("../.data/pglite"),
     BETTER_AUTH_SECRET: z.string().optional(),
-    EMAIL_MODE: z.enum(["console", "memory", "resend"]).default("console"),
+    EMAIL_MODE: z.enum(["console", "memory", "file", "resend"]).default("console"),
+    EMAIL_FILE: z.string().default("../.data/emails.jsonl"),
     RESEND_API_KEY: z.string().optional(),
+    EMAIL_FROM: z.string().default("Retenum <no-reply@retenum.local>"),
+    CRON_SECRET: z.string().optional(),
     PAYMENTS_MODE: z.enum(["test", "live"]).default("test"),
   })
   .superRefine((env, ctx) => {
@@ -22,6 +26,9 @@ const EnvSchema = z
       }
       if (!env.DATABASE_URL) {
         ctx.addIssue({ code: "custom", path: ["DATABASE_URL"], message: "Required in production (PGlite is dev/test only)" });
+      }
+      if (env.EMAIL_MODE !== "resend") {
+        ctx.addIssue({ code: "custom", path: ["EMAIL_MODE"], message: "Must be 'resend' in production" });
       }
       if (env.EMAIL_MODE === "resend" && !env.RESEND_API_KEY) {
         ctx.addIssue({ code: "custom", path: ["RESEND_API_KEY"], message: "Required when EMAIL_MODE=resend" });

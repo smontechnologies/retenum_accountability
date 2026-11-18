@@ -244,3 +244,4 @@ Rules:
 | Date | Change |
 |---|---|
 | 2026-11-18 | Created |
+| 2026-11-18 | Slice 1 findings: `next dev` runs with `--webpack` (Turbopack dev reload loop on macOS 13/Node 22.11); local data lives in `../.data` outside `app/`; e2e uses Playwright driving installed Chrome (bundled Chromium unsupported on macOS 13); dev/e2e email adapter writes JSON lines to a file and is refused in production; Tailwind pinned to 4.2.4 until Node ≥ 22.12 |

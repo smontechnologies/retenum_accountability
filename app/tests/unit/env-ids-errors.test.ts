@@ -24,6 +24,22 @@ describe("environment validation (NFR-09)", () => {
   });
 });
 
+describe("production email configuration", () => {
+  const saved2 = { ...process.env };
+  afterEach(() => {
+    process.env = { ...saved2 };
+    resetEnvCache();
+  });
+  it("refuses non-Resend email modes in production", () => {
+    (process.env as Record<string, string>).NODE_ENV = "production";
+    process.env.BETTER_AUTH_SECRET = "x".repeat(40);
+    process.env.DATABASE_URL = "postgres://u:p@localhost/db";
+    process.env.EMAIL_MODE = "file";
+    resetEnvCache();
+    expect(() => env()).toThrow(/EMAIL_MODE: Must be 'resend' in production/);
+  });
+});
+
 describe("ids and tokens (SEC-06)", () => {
   it("secret tokens have >=32 bytes of entropy and only the hash is derived", () => {
     const { token, hash } = newSecretToken();

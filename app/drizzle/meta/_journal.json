@@ -15,6 +15,13 @@
       "when": 1795024107230,
       "tag": "0001_append_only_triggers",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795024559183,
+      "tag": "0002_workspaces",
+      "breakpoints": true
     }
   ]
 }

@@ -1,5 +1,6 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { nextCookies } from "better-auth/next-js";
 import { getDb, type Database } from "../db/client";
 import { account, session, user, verification } from "../db/schema";
 import { env } from "../lib/env";
@@ -9,7 +10,7 @@ import { enqueueEmail } from "../outbox/outbox";
  * Authentication (TD-05). FR-ID-01 (password policy), FR-ID-02 (verification required),
  * FR-ID-03 (sessions), FR-ID-04 (reset). Counterparty email-OTP (FR-ID-05) is added in Slice 2.
  */
-export function createAuth(db: Database, options: { secret?: string; baseURL?: string } = {}) {
+export function createAuth(db: Database, options: { secret?: string; baseURL?: string; nextJs?: boolean } = {}) {
   const e = env();
   const secret = options.secret ?? e.BETTER_AUTH_SECRET;
   if (!secret) throw new Error("BETTER_AUTH_SECRET is not configured");
@@ -48,6 +49,8 @@ export function createAuth(db: Database, options: { secret?: string; baseURL?: s
       updateAge: 60 * 60 * 24, // refresh daily while active
     },
     rateLimit: { enabled: e.NODE_ENV === "production", window: 60, max: 30 },
+    // Lets server actions set the session cookie. Only inside Next.js request scope.
+    plugins: options.nextJs ? [nextCookies()] : [],
   });
 }
 
@@ -55,6 +58,6 @@ export type Auth = ReturnType<typeof createAuth>;
 
 let instance: Auth | undefined;
 export function getAuth(): Auth {
-  if (!instance) instance = createAuth(getDb());
+  if (!instance) instance = createAuth(getDb(), { nextJs: true });
   return instance;
 }

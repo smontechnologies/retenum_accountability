@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { StatusBadge } from "./status-badge";
 
 export default function HomePage() {
@@ -21,6 +22,10 @@ export default function HomePage() {
           <li>Retenum does not hold money or decide disputes.</li>
         </ul>
       </section>
+      <p className="flex gap-4">
+        <Link className="underline" href="/sign-in">Sign in</Link>
+        <Link className="underline" href="/sign-up">Create an account</Link>
+      </p>
     </div>
   );
 }
