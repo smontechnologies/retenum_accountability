@@ -40,7 +40,8 @@ export async function createWorkspaceAction(_: FormState, data: FormData): Promi
     return errorToFormState(err);
   }
   await selectWorkspace(id);
-  redirect("/app/business?created=1");
+  // Onboarding continues to the Overview, where the next step is the first engagement (FR-ONB-02).
+  redirect(str(data, "next") === "onboarding" ? "/app?welcome=1" : "/app/business?created=1");
 }
 
 export async function inviteMemberAction(_: FormState, data: FormData): Promise<FormState> {

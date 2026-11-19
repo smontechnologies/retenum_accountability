@@ -1,17 +1,14 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Browser, type Page } from "@playwright/test";
-import { noHorizontalOverflow, registerAndVerify } from "./helpers";
+import { noHorizontalOverflow, onboardWorkspace, registerAndVerify } from "./helpers";
 
 const PUBLIC_PAGES = ["/", "/sign-in", "/sign-up", "/forgot-password", "/offline.html", "/invite/not-a-real-token"];
 // /dev/components is development-only (404 in production) and is reviewed separately.
-const APP_PAGES = ["/app", "/app/engagements", "/app/payments", "/app/activity", "/app/business", "/app/settings"];
+const APP_PAGES = ["/app", "/app/engagements", "/app/engagements/new", "/app/payments", "/app/activity", "/app/business", "/app/business/new", "/app/settings"];
 const WIDTHS = [320, 390, 768, 1024, 1280, 1536];
 
 async function createWorkspace(page: Page, name: string) {
-  await page.goto("/app/business/new");
-  await page.getByLabel("Business or trading name").fill(name);
-  await page.getByRole("button", { name: "Create workspace" }).click();
-  await expect(page.getByRole("heading", { level: 1, name })).toBeVisible();
+  await onboardWorkspace(page, name);
 }
 
 async function signedInUser(browser: Browser, email: string) {
@@ -45,6 +42,19 @@ test.describe("design system gate (DES-08, DES-09)", () => {
     });
   }
 
+  test("onboarding page passes axe and has no overflow in both themes", async ({ browser }) => {
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const page = await context.newPage();
+    await registerAndVerify(page, "Onboard Check", "onboard-axe@example.com");
+    for (const theme of ["light", "dark"]) {
+      await page.evaluate((t) => document.documentElement.setAttribute("data-theme", t), theme);
+      const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]).analyze();
+      expect(results.violations.map((v) => v.id), theme).toEqual([]);
+      expect(await noHorizontalOverflow(page)).toBeLessThanOrEqual(0);
+    }
+    await context.close();
+  });
+
   test("no horizontal overflow at 320–1536 px, and the right navigation pattern per size", async ({ browser }) => {
     const { context, page } = await signedInUser(browser, "responsive@example.com");
     for (const width of WIDTHS) {
@@ -72,6 +82,7 @@ test("theme choice persists across reloads and on a second device (DES-02/03)", 
   const page = await first.newPage();
   await registerAndVerify(page, "Theme Person", email);
   await expect(page.locator("html")).toHaveAttribute("data-theme", "system");
+  await onboardWorkspace(page, "Theme Co");
 
   await page.goto("/app/settings");
   await page.getByRole("radio", { name: /Dark/ }).check();
@@ -90,7 +101,7 @@ test("theme choice persists across reloads and on a second device (DES-02/03)", 
   await p2.getByLabel("Email").fill(email);
   await p2.getByLabel("Password").fill("correct-horse-battery");
   await p2.getByRole("button", { name: "Sign in" }).click();
-  await expect(p2.getByRole("heading", { level: 1 })).toBeVisible();
+  await expect(p2.getByRole("heading", { level: 1, name: "Overview" })).toBeVisible();
   await expect(p2.locator("html")).toHaveAttribute("data-theme", "dark");
   await second.close();
 });

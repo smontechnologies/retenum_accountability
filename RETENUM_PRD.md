@@ -182,6 +182,14 @@ B2B SaaS. The initiating workspace pays a subscription priced by active engageme
 | FR-WS-06 | Removing a member does not alter any record they authored. Their past actions keep their name | M |
 | FR-WS-07 | Plan limits by active engagements and seats (D-33). Exceeding a limit blocks *creating* new engagements or seats, never responding to or closing existing ones | M |
 
+### 15.1a Onboarding (FR-ONB) — founder requirement, 19 Nov 2026
+
+| ID | Requirement | P |
+|---|---|---|
+| FR-ONB-01 | A verified user who belongs to no workspace is sent to onboarding from every app screen and cannot use the app until they create a workspace. **Exception (Slice 2):** a counterparty-only user (invited to confirm an engagement, D-43) is never forced to create a workspace; they land on that engagement | M |
+| FR-ONB-02 | Onboarding is two steps: (1) set up the business (create the workspace), (2) create the first engagement. After step 1 the user lands on the Overview with a "Your workspace is ready" message and a prominent "New engagement" action | M |
+| FR-ONB-03 | Users who already belong to a workspace never see onboarding. Invited colleagues join through their invitation link instead of creating a workspace | M |
+
 ### 15.2 Engagements and parties (FR-ENG)
 
 | ID | Requirement | P |
@@ -196,6 +204,8 @@ B2B SaaS. The initiating workspace pays a subscription priced by active engageme
 | FR-ENG-08 | Engagement statuses: `draft` → `awaiting_confirmation` → `active` → `closed_agreed` / `closed_open_items`. Plus `stopped`, and `withdrawn` (only from draft or awaiting_confirmation) | M |
 | FR-ENG-09 | The engagement page shows, in order: status and version; **items awaiting my response**; the financial statement; commitments; changes; deliveries; payments; timeline | M |
 | FR-ENG-10 | A list of the user's engagements across workspaces, filterable by status and "needs my response" | M |
+| FR-ENG-11 | "New engagement" is always available on the Overview (header) and the Engagements page, whether or not there are active engagements. When the plan limit is reached the action stays visible, and attempting it explains the limit (FR-WS-07) instead of hiding the option | M |
+| FR-ENG-12 | No empty engagements: the creation flow does not leave a blank engagement behind. A draft exists only once it has a title and counterparty, and it can't be sent for confirmation until it has at least one priced commitment and a payment schedule | M |
 
 ### 15.3 Commitments and baseline (FR-COM, FR-BAS)
 

@@ -32,3 +32,11 @@ export async function registerAndVerify(page: Page, name: string, email: string,
 export async function noHorizontalOverflow(page: Page): Promise<number> {
   return page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 }
+
+/** Completes onboarding step 1 (FR-ONB-01): creates the user's first workspace; ends on the Overview. */
+export async function onboardWorkspace(page: Page, name: string) {
+  await expect(page).toHaveURL(/\/onboarding/);
+  await page.getByLabel("Business or trading name").fill(name);
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Overview" })).toBeVisible();
+}

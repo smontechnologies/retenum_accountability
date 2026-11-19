@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { linkFromEmail, noHorizontalOverflow, registerAndVerify } from "./helpers";
+import { linkFromEmail, noHorizontalOverflow, onboardWorkspace, registerAndVerify } from "./helpers";
 
 /** Sign out from wherever the current layout puts it (More sheet on mobile, sidebar on desktop). */
 async function signOut(page: Page) {
@@ -46,16 +46,15 @@ test("UJ-1: register, verify, create a workspace, see plan limits, sign out and 
   await page.goto("/app");
   await expect(page).toHaveURL(/\/sign-in/);
 
-  // Verify via the emailed link → first-run overview.
+  // Verify via the emailed link → onboarding starts with the workspace (FR-ONB-01).
   await page.goto(await linkFromEmail(email, /Verify your email/));
-  await expect(page.getByRole("heading", { name: "Welcome to Retenum" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Set up your business" })).toBeVisible();
+  await onboardWorkspace(page, "Ada Studio");
+  await expect(page.getByText("Your workspace is ready")).toBeVisible();
 
-  // Create a workspace.
-  await page.getByRole("link", { name: "Create a workspace" }).click();
-  await page.getByLabel("Business or trading name").fill("Ada Studio");
-  await page.getByRole("button", { name: "Create workspace" }).click();
+  // The workspace and its plan limits.
+  await page.goto("/app/business");
   await expect(page.getByRole("heading", { level: 1, name: "Ada Studio" })).toBeVisible();
-  await expect(page.getByText("Workspace created")).toBeVisible();
   await expect(page.getByText("1 of 1 seat used on the free plan.")).toBeVisible();
 
   // Free plan seat limit is enforced with a clear message (FR-WS-07).
@@ -82,6 +81,7 @@ test("UJ-1: register, verify, create a workspace, see plan limits, sign out and 
 test("FR-ID-04: reset a forgotten password via the emailed link", async ({ page }, info) => {
   const email = `reset-${info.project.name}@example.com`;
   await registerAndVerify(page, "Reset Person", email, "original-password-1");
+  await onboardWorkspace(page, "Reset Co");
   await signOut(page);
 
   await page.goto("/forgot-password");
@@ -98,8 +98,7 @@ test("FR-ID-04: reset a forgotten password via the emailed link", async ({ page 
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill("replacement-password-2");
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-  await expect(page).toHaveURL(/\/app$/);
+  await expect(page.getByRole("heading", { level: 1, name: "Overview" })).toBeVisible();
 });
 
 test("invalid invitation links show a clear message and no workspace details", async ({ page }) => {
@@ -128,4 +127,24 @@ test("forms submitted before JavaScript loads post to the server and never put v
   expect(page.url()).not.toContain("no-script-password-1");
   await expect(page.getByRole("heading", { name: "Check your email" })).toBeVisible();
   await context.close();
+});
+
+test("onboarding: no app screen without a workspace; New engagement always available and creates nothing (FR-ONB-01/02, FR-ENG-11)", async ({ page }, info) => {
+  await registerAndVerify(page, "New Person", `onboard-${info.project.name}@example.com`);
+  // Every app route leads to onboarding until a workspace exists.
+  for (const path of ["/app", "/app/engagements", "/app/payments", "/app/settings", "/app/business"]) {
+    await page.goto(path);
+    await expect(page, path).toHaveURL(/\/onboarding/);
+  }
+  await onboardWorkspace(page, "First Co");
+  // Overview: the button is in the header AND in the first-engagement prompt.
+  await expect(page.getByRole("link", { name: "New engagement" })).toHaveCount(2);
+  await page.goto("/app/engagements");
+  await expect(page.getByRole("main").getByRole("link", { name: "New engagement" }).first()).toBeVisible();
+  await page.getByRole("main").getByRole("link", { name: "New engagement" }).first().click();
+  await expect(page).toHaveURL(/\/app\/engagements\/new/);
+  await expect(page.getByText("Nothing has been created")).toBeVisible();
+  // Onboarding is not shown again once a workspace exists.
+  await page.goto("/onboarding");
+  await expect(page).toHaveURL(/\/app$/);
 });

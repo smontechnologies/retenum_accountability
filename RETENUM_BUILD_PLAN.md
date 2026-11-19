@@ -122,7 +122,7 @@ A UI slice is only done when the design system §11 checklist passes: tokens and
 
 - **Objective:** an initiator creates an engagement with commitments and a payment schedule. The counterparty joins through a secure link and email code, and confirms, requests changes or declines.
 - **User value:** UJ-2. **This is the first design-partner test of payer participation.**
-- **Requirements:** FR-ENG-01…06, 08…10; FR-COM-01…05; FR-BAS-01…05; FR-ID-05; FR-HIS-01, 04 (basic timeline); NOT-02/03/04; AC-BAS-1/2; §17 rows for drafts and baseline.
+- **Requirements:** FR-ENG-01…06, 08…12 (the New engagement entry point and onboarding already exist; Slice 2 replaces the placeholder `/app/engagements/new` with the real flow and adds the FR-ONB-01 counterparty exemption); FR-COM-01…05; FR-BAS-01…05; FR-ID-05; FR-HIS-01, 04 (basic timeline); NOT-02/03/04; AC-BAS-1/2; §17 rows for drafts and baseline.
 - **Dependencies:** Slice 1.
 - **Frontend:**
   - engagement list and "needs my response";
@@ -400,3 +400,12 @@ A UI slice is only done when the design system §11 checklist passes: tokens and
 - No automated test yet for the update prompt (requires deploying two service-worker versions). Behaviour reviewed in code.
 - iOS install behaviour was not tested on a device (Playwright drives Chrome only).
 - Lighthouse PWA audit not run.
+
+### Onboarding and "New engagement" entry point (19 Nov 2026, founder requirement)
+
+- **Built:**
+  - `/onboarding` (step 1 of 2: set up your business). The app layout redirects any workspace-less user there. After creating the workspace, the user lands on the Overview with "Your workspace is ready" (step 2 of 2: first engagement).
+  - An always-visible **New engagement** button on Overview (header, plus a first-engagement prompt when there are none) and on Engagements.
+  - `/app/engagements/new` is a placeholder that deliberately creates nothing (no empty engagement) until Slice 2 replaces it.
+- **Requirements:** FR-ONB-01…03, FR-ENG-11 (entry point); FR-ENG-12 recorded for Slice 2.
+- **Tests run:** `pnpm test` 98 passed; `pnpm test:e2e` **21 passed, 7 skipped by design**. New: every app route redirects to onboarding until a workspace exists; onboarding passes axe in light and dark with no overflow at 390 px; New engagement visible on Overview (twice when there are no engagements) and Engagements; following it creates nothing; onboarding is not shown again once a workspace exists. Typecheck passed.

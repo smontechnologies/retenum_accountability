@@ -163,6 +163,7 @@ If either answer is negative, the fallback (D-29) keeps the product useful.
 | D-60 | **Strictly monochrome identity** (black, white, neutral greys), with light, dark and system themes. Spec: `RETENUM_DESIGN_SYSTEM.md` | DECIDED (founder requirement) |
 | D-61 | **Delivered as a Progressive Web App**, mobile-first and excellent on desktop. Spec: `RETENUM_UI_UX_SPECIFICATION.md` | DECIDED (founder requirement) |
 | D-62 | **No offline queueing of commercial actions.** Offline is read-only for already-open pages, and nothing is confirmed, recorded or paid without the server | DECIDED |
+| D-64 | **Guided onboarding, no empty states as destinations:** a workspace must be created before using the app; "New engagement" is always visible on Overview and Engagements; creation never leaves an empty engagement (FR-ONB-01…03, FR-ENG-11/12) | DECIDED (founder requirement) |
 | D-63 | **A design-system slice (1A) comes before further screens**, and the design quality gate is part of every UI slice | DECIDED |
 
 ## 6a. Build order
@@ -193,6 +194,7 @@ If either answer is negative, the fallback (D-29) keeps the product useful.
 
 | Date | Change | Reason |
 |---|---|---|
+| 2026-11-19 | Added D-64 (onboarding and always-available New engagement) | Founder requirement |
 | 2026-11-18 | Added D-60…D-63 (monochrome identity, PWA, no offline queueing, design slice first) | Founder design and PWA requirements |
 | 2026-11-18 | Payment provider switched from Paystack to **Bachs** (D-27, D-23, D-26, D-28, new D-29a, G-PAY items 1–3, O-08, O-09). Provider integration moved to the **last** slice (D-50) | Founder instruction |
 | 2026-11-18 | Document created. D-21 supersedes Phase 3's provisional England & Wales choice. D-00 records the founder's decision to build in parallel with validation | Founder brief (product finalisation) |

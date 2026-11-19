@@ -128,6 +128,7 @@ Every table becomes a stacked list at < 768: one row becomes a block with its ma
 
 | # | Screen | Route | Purpose | Slice |
 |---|---|---|---|---|
+| S0 | Onboarding: set up your business (step 1 of 2) | `/onboarding` | No app screen without a workspace; then the Overview prompts the first engagement (FR-ONB-01/02) | 1A+ |
 | S1 | Sign in, sign up, check email, forgot / reset password | `/sign-in` etc. | Access | 1 → restyled 1A |
 | S2 | Workspace invitation | `/invite/[token]` | Join a team | 1 → 1A |
 | S3 | Overview | `/app` | What needs me, money position, recent activity | 1A (empty states) → filled in 2–5 |
@@ -156,7 +157,7 @@ Every table becomes a stacked list at < 768: one row becomes a block with its ma
 
 | Journey | Flow |
 |---|---|
-| UJ-1 Set up | S1 sign up → check email → verify → S16 create workspace → S15 invite team |
+| UJ-1 Set up | S1 sign up → check email → verify → **S0 onboarding (create workspace)** → S3 Overview ("Your workspace is ready", **New engagement**) → S15 invite team (optional) |
 | UJ-2 Create and confirm | S4 → S5 draft (commitments → schedule → response windows → counterparty) → review → submit → counterparty S12 (code → baseline review → acknowledge → confirm) → both see S6 **Active v1** |
 | UJ-3 Change with authorisation before valuation | S8 composer (what changes → price and time effect → schedule effect → reason) → send → payer S8 detail: **three separate response controls** → "Authorise work only" + valuation counter → payee counters → payer confirms valuation → v2 |
 | UJ-4 Delivery and partial acceptance | S9 submit (pick deliverables → claim → evidence) → payer review (Accept / Accept with issues / Partly accept / Request correction / Reject) → obligations become due pro-rata in S10 |
