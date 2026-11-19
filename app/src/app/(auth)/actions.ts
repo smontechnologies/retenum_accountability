@@ -15,7 +15,7 @@ const Email = z.string().trim().toLowerCase().pipe(z.email("Enter a valid email 
 const Password = z.string().min(10, "Use at least 10 characters").max(128, "Use at most 128 characters");
 
 function fieldErrors(error: z.ZodError): FormState {
-  return { status: "error", message: "Please check the highlighted fields.", fields: Object.fromEntries(error.issues.map((i) => [String(i.path[0]), i.message])) };
+  return { status: "error", message: "Some details need fixing.", fields: Object.fromEntries(error.issues.map((i) => [String(i.path[0]), i.message])) };
 }
 
 export async function signUpAction(_: FormState, data: FormData): Promise<FormState> {

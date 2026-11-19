@@ -13,6 +13,8 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // Lets e2e build into its own folder so it never disturbs a running `pnpm dev`.
+  distDir: process.env.NEXT_DIST_DIR ?? ".next",
   // Pin the project root so a stray lockfile in a parent folder is never used.
   turbopack: { root: path.resolve(import.meta.dirname) },
   outputFileTracingRoot: path.resolve(import.meta.dirname),

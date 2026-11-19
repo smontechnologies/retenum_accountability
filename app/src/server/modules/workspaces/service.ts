@@ -24,7 +24,7 @@ export const MAX_INVITATIONS_PER_HOUR = 20; // SEC-05
 function parse<T extends z.ZodType>(schema: T, input: unknown): z.output<T> {
   const result = schema.safeParse(input);
   if (!result.success) {
-    throw validationError("Please check the highlighted fields.", {
+    throw validationError("Some details need fixing.", {
       fields: Object.fromEntries(result.error.issues.map((i) => [i.path.join("."), i.message])),
     });
   }

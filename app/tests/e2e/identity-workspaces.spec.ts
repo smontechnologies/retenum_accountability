@@ -21,8 +21,13 @@ test("UJ-1: register, verify, create a workspace, see plan limits, sign out and 
   await page.goto("/sign-up");
   await page.getByLabel("Password").fill("short");
   await page.getByRole("button", { name: "Create account" }).click();
-  await expect(page.getByRole("main").getByRole("alert")).toContainText("check the highlighted fields");
-  await expect(page.getByText("Use at least 10 characters")).toBeVisible();
+  // The summary names each problem in plain words, and focus moves to the first field to fix.
+  const summary = page.getByRole("main").getByRole("alert");
+  await expect(summary).toContainText("Fix these");
+  await expect(summary).toContainText("Password: use at least 10 characters");
+  await expect(summary).not.toContainText("check");
+  await expect(page.getByLabel("Your name")).toBeFocused();
+  await expect(page.getByText("Use at least 10 characters", { exact: true })).toBeVisible(); // inline, under the field
 
   await page.getByLabel("Your name").fill("Ada Obi");
   await page.getByLabel("Email").fill(email);

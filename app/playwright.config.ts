@@ -35,6 +35,7 @@ export default defineConfig({
       PGLITE_DIR: `${DATA}/db`,
       EMAIL_MODE: "file",
       E2E_LOCAL_PRODUCTION: "1",
+      NEXT_DIST_DIR: ".next-e2e",
       EMAIL_FILE: `${DATA}/emails.jsonl`,
       BETTER_AUTH_SECRET: "e2e-secret-e2e-secret-e2e-secret-000000",
     },

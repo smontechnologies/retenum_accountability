@@ -12,6 +12,9 @@ import { useOnline } from "./use-online";
 type ClientState = FormState & { values?: Record<string, string> };
 const IDLE: FormState = { status: "idle" };
 const StateContext = createContext<ClientState>({ status: "idle" });
+/** Field name → { label, id }, so the error summary can name and link each problem (design system §9.5). */
+type Registry = Map<string, { label: string; id: string }>;
+const RegistryContext = createContext<Registry | null>(null);
 type Action = (prev: FormState, data: FormData) => Promise<FormState>;
 
 /** Fields never echoed back after a submission. */
@@ -69,6 +72,17 @@ export function ActionForm({
     ? { status: "error", message: "You're offline. Nothing was sent. Try again when you're back online.", values: submitted.current }
     : { ...state, values: state.status === "error" ? submitted.current : undefined };
 
+  const registry = useRef<Registry>(new Map()).current;
+  const formRef = useRef<HTMLFormElement>(null);
+  const fieldErrors = Object.entries(view.fields ?? {}).filter(([k]) => !k.startsWith("_"));
+
+  // Move focus to the first field that needs fixing, so the problem can't be missed.
+  useEffect(() => {
+    if (view.status !== "error" || fieldErrors.length === 0) return;
+    formRef.current?.querySelector<HTMLElement>("[aria-invalid='true']")?.focus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state]);
+
   const lastToasted = useRef<FormState | null>(null);
   useEffect(() => {
     if (state.status === "success" && successToast && lastToasted.current !== state) {
@@ -78,10 +92,30 @@ export function ActionForm({
   }, [state, successToast, toast]);
 
   return (
-    <form action={formAction} onSubmit={onSubmit} className="space-y-5" noValidate>
+    <form ref={formRef} action={formAction} onSubmit={onSubmit} className="space-y-5" noValidate>
+      <RegistryContext.Provider value={registry}>
       <StateContext.Provider value={view}>
-        {view.message && (view.status === "error" || showSuccessInline) && (
-          <Alert tone={view.status === "error" ? "error" : "success"}>{view.message}</Alert>
+        {view.status === "error" && fieldErrors.length > 0 ? (
+          <Alert tone="error" title={fieldErrors.length === 1 ? "Fix this to continue" : `Fix these ${fieldErrors.length} things to continue`}>
+            <ul className="mt-1 space-y-0.5">
+              {fieldErrors.map(([name, message]) => {
+                const f = registry.get(name);
+                return (
+                  <li key={name}>
+                    {f ? (
+                      <a href={`#${f.id}`} className="underline underline-offset-2">
+                        {f.label}: {message.charAt(0).toLowerCase() + message.slice(1)}
+                      </a>
+                    ) : (
+                      message
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </Alert>
+        ) : (
+          view.message && (view.status === "error" || showSuccessInline) && <Alert tone={view.status === "error" ? "error" : "success"}>{view.message}</Alert>
         )}
         {children}
         <div className="space-y-2">
@@ -95,6 +129,7 @@ export function ActionForm({
           )}
         </div>
       </StateContext.Provider>
+      </RegistryContext.Provider>
     </form>
   );
 }
@@ -104,7 +139,9 @@ function useFieldState(name: string) {
   return { error: state.fields?.[name], kept: state.values?.[name] };
 }
 
-function FieldShell({ id, label, hint, error, children }: { id: string; label: string; hint?: string; error?: string; children: React.ReactNode }) {
+function FieldShell({ id, label, hint, error, children, name }: { id: string; label: string; hint?: string; error?: string; children: React.ReactNode; name?: string }) {
+  const registry = useContext(RegistryContext);
+  if (registry && name) registry.set(name, { label, id });
   return (
     <div className="space-y-1.5">
       <label htmlFor={id} className="block text-small font-medium">
@@ -139,7 +176,7 @@ export function Field({ name, label, type = "text", hint, defaultValue, ...rest 
   const id = useId();
   const { error, kept } = useFieldState(name);
   return (
-    <FieldShell id={id} label={label} hint={hint} error={error}>
+    <FieldShell id={id} name={name} label={label} hint={hint} error={error}>
       <input
         key={kept ?? "initial"}
         id={id}
@@ -159,7 +196,7 @@ export function TextareaField({ name, label, hint, defaultValue, rows = 4, ...re
   const id = useId();
   const { error, kept } = useFieldState(name);
   return (
-    <FieldShell id={id} label={label} hint={hint} error={error}>
+    <FieldShell id={id} name={name} label={label} hint={hint} error={error}>
       <textarea
         key={kept ?? "initial"}
         id={id}
@@ -179,7 +216,7 @@ export function SelectField({ name, label, hint, options, defaultValue }: { name
   const id = useId();
   const { error, kept } = useFieldState(name);
   return (
-    <FieldShell id={id} label={label} hint={hint} error={error}>
+    <FieldShell id={id} name={name} label={label} hint={hint} error={error}>
       <select
         key={kept ?? "initial"}
         id={id}
