@@ -522,3 +522,15 @@ A UI slice is only done when the design system §11 checklist passes: tokens and
   - UJ-2 rewritten for the guided path (errors, live figures, generated clauses, money note, conditional reminder, hidden chaining, send, change request, confirmation): **passed on mobile and desktop** with the design gate on the questions page.
   - The first run failed on desktop because of test timing (the condition was entered before the pane switched to the step). The test now waits for the step heading.
   - **Full e2e suite on the final branch code: 23 passed, 7 skipped by design (run-once desktop groups), 0 failed.**
+
+### Compact engagement workspace (20 Nov 2026, founder feedback)
+
+- **Built:**
+  - a compact header with a small money strip (new `LedgerStrip compact` variant);
+  - a collapsible list of things to fix before sending, and a one-line "Ready to send" bar;
+  - a denser canvas with a Bubble-style connector and small "+" buttons;
+  - a collapsible workflow list on phones and tablets;
+  - a sticky property pane;
+  - `scroll-padding-top` for the sticky phone bar.
+- **Found by the design gate:** axe target-size flagged the active tab on mobile because the shorter header let scrolled-into-view elements sit under the sticky bar. Fixed in the app with scroll padding, not by relaxing the test.
+- **Tests run:** unit and integration 134/134; UJ-2 **passed on mobile and desktop** with the design gate (light and dark, 320 px overflow).

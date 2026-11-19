@@ -204,6 +204,13 @@ The engagement **is** its workflows. Sections: **Workflows** (the editor, defaul
 - **Layout:**
   - wide (xl and up): three panes;
   - below xl: list, then canvas, with the property editor opening as a **bottom sheet** when a trigger or step is selected. The editor is rendered in exactly one place at a time.
+- **Compact workspace (20 Nov 2026, founder feedback):**
+  - the engagement header is one block: badge, title (h2) and party on the left, with a compact money strip (Agreed · Paid · Outstanding · Due now) on the right, wrapping underneath on phones;
+  - "things to fix before sending" collapses to one expandable line, and "Ready to send" is a single bar;
+  - cards are tighter, and a small "+" sits on a connector line between steps;
+  - below lg the workflow list collapses to "Workflows (n) · current", and picking a workflow collapses it again;
+  - the property pane is sticky and scrolls on its own;
+  - `scroll-padding-top` keeps anything scrolled into view or focused clear of the sticky phone bar (WCAG 2.4.11).
 - **Locking:** editable only by the initiator while it is a draft. Once sent, both parties see the same canvas without "+", move or delete controls. Once confirmed, the workflows are version 1 and change only through confirmed changes (Slice 3).
 - **Wording:** canvas, clauses and the confirmation snapshot use one sentence generator (`domain/workflow.ts`), so what is shown is exactly what is confirmed. Builder words ("trigger") stay in the editor; clauses use plain language ("since this workflow started").
 

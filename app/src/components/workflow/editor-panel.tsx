@@ -20,16 +20,16 @@ export function PropertyEditor({ options, selection, editable, readOnly }: { opt
   if (selection.kind === "trigger") {
     const t = selection.trigger;
     return (
-      <div className="space-y-8">
+      <div className="space-y-5">
         <section aria-label="Trigger" className="space-y-3">
-          <h2 className="text-h3 font-semibold">Trigger</h2>
+          <h2 className="font-semibold">Trigger</h2>
           <ActionForm key={t.workflowId} action={updateTriggerAction} submitLabel="Save trigger" successToast="Trigger saved." showSuccessInline={false}>
             <input type="hidden" name="engagementId" value={options.engagementId} />
             <input type="hidden" name="workflowId" value={t.workflowId} />
             <TriggerFields options={options} trigger={t} />
           </ActionForm>
         </section>
-        <section aria-label="Workflow condition" className="space-y-3 border-t border-line pt-6">
+        <section aria-label="Workflow condition" className="space-y-3 border-t border-line pt-4">
           {selection.conditionAllowed ? (
             <ActionForm key={`c-${t.workflowId}`} action={setConditionAction} submitLabel="Save condition" successToast="Condition saved." showSuccessInline={false}>
               <input type="hidden" name="engagementId" value={options.engagementId} />
@@ -41,7 +41,7 @@ export function PropertyEditor({ options, selection, editable, readOnly }: { opt
             <MoneyNote what="This workflow includes money, so it always runs when triggered." />
           )}
         </section>
-        <section aria-label="Workflow actions" className="flex flex-wrap items-center gap-1 border-t border-line pt-6">
+        <section aria-label="Workflow actions" className="flex flex-wrap items-center gap-1 border-t border-line pt-4">
           <MoveButtons hidden={{ ...hidden, workflowId: t.workflowId }} isFirst={selection.isFirst} isLast={selection.isLast} label="workflow" />
           <ConfirmAction
             trigger="Delete workflow"
@@ -61,17 +61,17 @@ export function PropertyEditor({ options, selection, editable, readOnly }: { opt
   }
   const s = selection.step;
   return (
-    <div className="space-y-8">
+    <div className="space-y-5">
       <section aria-label="Step" className="space-y-3">
         <p className="text-caption text-fg-muted">Step {selection.number}</p>
-        <h2 className="text-h3 font-semibold">{ACTIONS[s.actionType].label}</h2>
+        <h2 className="font-semibold">{ACTIONS[s.actionType].label}</h2>
         <ActionForm key={s.id} action={updateStepAction} submitLabel="Save step" successToast="Step saved." showSuccessInline={false}>
           <input type="hidden" name="engagementId" value={options.engagementId} />
           <input type="hidden" name="stepId" value={s.id} />
           <StepFields actionType={s.actionType} options={options} step={s} />
         </ActionForm>
       </section>
-      <section aria-label="Step condition" className="space-y-3 border-t border-line pt-6">
+      <section aria-label="Step condition" className="space-y-3 border-t border-line pt-4">
         {selection.conditionAllowed ? (
           <ActionForm key={`c-${s.id}`} action={setConditionAction} submitLabel="Save condition" successToast="Condition saved." showSuccessInline={false}>
             <input type="hidden" name="engagementId" value={options.engagementId} />
@@ -83,7 +83,7 @@ export function PropertyEditor({ options, selection, editable, readOnly }: { opt
           <MoneyNote what="This step is about money, so it always happens when its workflow runs." />
         )}
       </section>
-      <section aria-label="Step actions" className="flex flex-wrap items-center gap-1 border-t border-line pt-6">
+      <section aria-label="Step actions" className="flex flex-wrap items-center gap-1 border-t border-line pt-4">
         <MoveButtons hidden={{ ...hidden, stepId: s.id }} isFirst={selection.isFirst} isLast={selection.isLast} label="step" />
         <ConfirmAction
           trigger="Delete step"
@@ -118,7 +118,7 @@ function MoveButtons({ hidden, isFirst, isLast, label }: { hidden: Record<string
       <form action={moveAction}>
         {Object.entries(hidden).map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
         <input type="hidden" name="direction" value={direction} />
-        <button type="submit" className="inline-flex min-h-11 items-center gap-1.5 rounded-control px-3 text-small hover:bg-surface">
+        <button type="submit" className="inline-flex min-h-10 items-center gap-1.5 rounded-control px-2.5 text-small hover:bg-surface">
           <Icon aria-hidden className="size-4" /> Move {label} {direction}
         </button>
       </form>
@@ -150,7 +150,7 @@ export function PropertyPane({ open, title, closeHref, children }: { open: boole
     return () => mq.removeEventListener("change", update);
   }, []);
   if (wide !== false) {
-    return <aside aria-label="Property editor" className="hidden rounded-panel border border-line bg-raised p-4 xl:block xl:self-start">{children}</aside>;
+    return <aside aria-label="Property editor" className="hidden rounded-panel border border-line bg-raised p-3 xl:sticky xl:top-4 xl:block xl:max-h-[calc(100dvh-2rem)] xl:self-start xl:overflow-y-auto">{children}</aside>;
   }
   return (
     <Dialog

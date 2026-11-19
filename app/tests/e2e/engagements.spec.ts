@@ -41,6 +41,13 @@ async function closeSheetIfOpen(page: Page) {
   }
 }
 
+/** Below lg the workflow list is collapsed behind a one-line toggle. */
+async function workflowList(page: Page) {
+  const toggle = page.getByRole("button", { name: /^Workflows \(\d+\)/ });
+  if ((await toggle.isVisible()) && (await toggle.getAttribute("aria-expanded")) === "false") await toggle.click();
+  return page.getByRole("navigation", { name: "Workflows" });
+}
+
 const section = (page: Page, name: string) => page.getByRole("navigation", { name: "Engagement sections" }).getByRole("link", { name });
 
 test("UJ-2 (D-67): guided questions write the agreement, edit it as workflows, send; the client asks for changes, then confirms → Active v1", async ({ page, browser }, info) => {
@@ -90,7 +97,7 @@ test("UJ-2 (D-67): guided questions write the agreement, edit it as workflows, s
   const canvas = page.getByRole("region", { name: "Workflow canvas" });
   await expect(canvas).toContainText("When the agreement is confirmed");
   await expect(canvas).toContainText("Ada Studio delivers “Launch assets” for ₦900,000.00");
-  await page.getByRole("navigation", { name: "Workflows" }).getByRole("link", { name: /Launch assets.*is accepted/ }).click();
+  await (await workflowList(page)).getByRole("link", { name: /Launch assets.*is accepted/ }).click();
   await canvas.getByRole("link", { name: /Balance/ }).click();
   const props = properties(page);
   await expect(props.getByRole("heading", { name: "Make a payment due", exact: true })).toBeVisible();
@@ -100,7 +107,7 @@ test("UJ-2 (D-67): guided questions write the agreement, edit it as workflows, s
   await closeSheetIfOpen(page);
 
   // Helpers can be conditional: a reminder workflow.
-  await page.getByRole("button", { name: "New workflow" }).click();
+  await (await workflowList(page)).getByRole("button", { name: "New workflow" }).click();
   const nw = page.getByRole("dialog");
   await expect(nw.getByLabel("When this happens").locator("option", { hasText: "Another workflow finishes" })).toHaveCount(0);
   await nw.getByLabel("When this happens").selectOption({ label: "Someone doesn't respond in time" });
@@ -121,7 +128,7 @@ test("UJ-2 (D-67): guided questions write the agreement, edit it as workflows, s
   await props.getByRole("button", { name: "Save condition" }).click();
   await expect(canvas).toContainText("Only when fewer than 30 days have passed since this workflow started");
   await closeSheetIfOpen(page);
-  await expect(page.getByRole("navigation", { name: "Workflows" })).toContainText("Reminders");
+  await expect(await workflowList(page)).toContainText("Reminders");
   await expect(page.getByText("Ready to send")).toBeVisible();
   await expectDesignGate(page, "workflow editor");
   await shot(page, "g-editor", p);

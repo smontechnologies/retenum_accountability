@@ -134,6 +134,14 @@
     color: var(--fg);
     font-family: var(--font-sans);
     -webkit-text-size-adjust: 100%;
+    /* Below lg the app bar is sticky (3.5rem): anything scrolled into view or focused stops below it
+       (WCAG 2.4.11 Focus Not Obscured; found by axe target-size on the compact header). */
+    scroll-padding-top: 4.5rem;
+  }
+  @media (min-width: 64rem) {
+    html {
+      scroll-padding-top: 1rem;
+    }
   }
   body {
     background: var(--bg);

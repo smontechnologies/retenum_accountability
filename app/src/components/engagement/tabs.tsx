@@ -27,7 +27,7 @@ export function EngagementTabs({ id }: { id: string }) {
                 href={href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "-mb-px inline-flex min-h-11 items-center border-b-2 text-small",
+                  "-mb-px inline-flex min-h-10 items-center border-b-2 text-small",
                   active ? "border-fg font-semibold text-fg" : "border-transparent text-fg-secondary hover:text-fg",
                 )}
               >

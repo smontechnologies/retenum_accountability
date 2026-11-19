@@ -21,19 +21,23 @@ export default async function EngagementLayout(props: { children: React.ReactNod
   }
   const st = ENGAGEMENT_STATUS[v.status];
   return (
-    <div className="space-y-6">
-      <header className="space-y-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <StatusBadge status={st.key} label={st.label} />
-          {v.engagement.currentVersion > 0 && <span className="text-caption text-fg-muted">Version {v.engagement.currentVersion}</span>}
+    <div className="space-y-4">
+      <header className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+        <div className="min-w-0 space-y-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusBadge status={st.key} label={st.label} />
+            {v.engagement.currentVersion > 0 && <span className="text-caption text-fg-muted">Version {v.engagement.currentVersion}</span>}
+          </div>
+          <h1 className="text-h2 font-semibold break-words">{v.engagement.title}</h1>
+          <p className="text-small text-fg-secondary">
+            With <span className="font-medium text-fg">{v.other.orgName}</span>
+            {v.other.repName ? ` (${v.other.repName})` : ""} · you are {SIDE_LABEL[v.viewer.side]}
+          </p>
         </div>
-        <h1 className="text-display font-semibold break-words">{v.engagement.title}</h1>
-        <p className="text-body text-fg-secondary">
-          With <span className="font-medium text-fg">{v.other.orgName}</span>
-          {v.other.repName ? ` (${v.other.repName})` : ""} · you are {SIDE_LABEL[v.viewer.side]}
-        </p>
+        <div className="lg:shrink-0">
+          <LedgerStrip compact figures={{ agreed: v.figures.agreed, paid: v.figures.paid, outstanding: v.figures.outstanding, due: v.status === "active" ? v.figures.due : undefined }} />
+        </div>
       </header>
-      <LedgerStrip figures={{ agreed: v.figures.agreed, paid: v.figures.paid, outstanding: v.figures.outstanding, due: v.status === "active" ? v.figures.due : undefined }} />
       <EngagementTabs id={id} />
       {props.children}
     </div>

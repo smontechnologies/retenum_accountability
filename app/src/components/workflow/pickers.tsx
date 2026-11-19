@@ -33,11 +33,11 @@ export function AddStepButton({ options, workflowId, insertAfter, label = "Add a
         className={cn(
           "inline-flex items-center justify-center gap-2 text-small font-medium",
           variant === "block"
-            ? "min-h-12 w-full rounded-panel border border-dashed border-line-strong hover:bg-surface"
-            : "size-9 rounded-full border border-line-strong bg-bg text-fg-secondary hover:border-fg hover:text-fg",
+            ? "min-h-10 w-full rounded-panel border border-dashed border-line-strong hover:bg-surface"
+            : "relative size-7 rounded-full border border-line-strong bg-bg text-fg-secondary hover:border-fg hover:text-fg",
         )}
       >
-        <Plus aria-hidden className="size-4" />
+        <Plus aria-hidden className={variant === "block" ? "size-4" : "size-3.5"} />
         {variant === "block" && label}
       </button>
       <Dialog open={menu} onClose={() => setMenu(false)} title="Add a step" description="Choose what happens at this point in the workflow." variant="drawer">
@@ -91,7 +91,7 @@ export function NewWorkflowButton({ options }: { options: EditorOptions }) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className="flex min-h-11 w-full items-center gap-2 rounded-control px-3 text-small font-medium text-fg-secondary hover:bg-surface hover:text-fg">
+      <button type="button" onClick={() => setOpen(true)} className="flex min-h-10 w-full items-center gap-2 rounded-control px-2.5 text-small font-medium text-fg-secondary hover:bg-surface hover:text-fg">
         <Plus aria-hidden className="size-4" /> New workflow
       </button>
       <Dialog open={open} onClose={() => setOpen(false)} title="New workflow" description="Choose what starts it. You'll add its steps next." variant="drawer">

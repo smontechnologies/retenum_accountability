@@ -7,10 +7,12 @@ import type { CommitmentView } from "@/domain/baseline";
 import { Canvas } from "@/components/workflow/canvas";
 import { PropertyEditor, PropertyPane } from "@/components/workflow/editor-panel";
 import { WorkflowList } from "@/components/workflow/list";
+import { WorkflowListToggle } from "@/components/workflow/list-toggle";
 import { AddStepButton } from "@/components/workflow/pickers";
 import type { EditableStep, EditorOptions } from "@/components/workflow/types";
 import { Alert } from "@/components/ui/alert";
 import { ButtonLink } from "@/components/ui/button";
+import { ChevronDown, CircleCheck, Info } from "lucide-react";
 
 export const metadata = { title: "Workflows" };
 
@@ -86,7 +88,7 @@ export default async function WorkflowEditorPage(props: { params: Promise<{ id: 
   const panel = <PropertyEditor options={options} selection={selection} editable={editable} readOnly={readOnly} />;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-3">
       {editable && v.workflows.every((w) => w.steps.length === 0) && (
         <Alert tone="info" title="Start with a few questions">
           Tell Retenum what you'll deliver and how you'll be paid, and it sets up the workflows for you. Or use + below to build them yourself.{" "}
@@ -94,14 +96,22 @@ export default async function WorkflowEditorPage(props: { params: Promise<{ id: 
         </Alert>
       )}
       {v.status === "draft" && v.viewer.isInitiatorSide && v.workflows.some((w) => w.steps.length > 0) && v.problems.length > 0 && (
-        <Alert tone="info" title="Before you can send this">
-          <ul className="mt-1 list-disc space-y-0.5 pl-5">{v.problems.slice(0, 4).map((p) => <li key={p}>{p}</li>)}</ul>
-        </Alert>
+        <details className="group rounded-panel border border-line bg-raised px-3 py-2 text-small">
+          <summary className="flex min-h-8 cursor-pointer list-none items-center gap-2 font-medium [&::-webkit-details-marker]:hidden">
+            <Info aria-hidden className="size-4 shrink-0" />
+            {v.problems.length} {v.problems.length === 1 ? "thing" : "things"} to fix before sending
+            <ChevronDown aria-hidden className="ml-auto size-4 transition-transform group-open:rotate-180" />
+          </summary>
+          <ul className="mt-1 mb-1 list-disc space-y-0.5 pl-8 text-fg-secondary">{v.problems.map((p) => <li key={p}>{p}</li>)}</ul>
+        </details>
       )}
       {v.status === "draft" && v.viewer.isInitiatorSide && v.problems.length === 0 && (
-        <Alert tone="success" title="Ready to send">
-          Read it as an agreement and send it to {v.other.orgName}. <Link href={`${base}/agreement`} className="font-medium underline underline-offset-4">Read as agreement</Link>
-        </Alert>
+        <p className="flex min-h-10 flex-wrap items-center gap-x-2 rounded-panel border border-line bg-raised px-3 py-1.5 text-small">
+          <CircleCheck aria-hidden className="size-4 shrink-0" />
+          <span className="font-medium">Ready to send</span>
+          <span className="text-fg-secondary">to {v.other.orgName}.</span>
+          <Link href={`${base}/agreement`} className="font-medium underline underline-offset-4">Read as agreement</Link>
+        </p>
       )}
       {v.can.respond && (
         <Alert tone="warning" title="Your response is needed">
@@ -110,20 +120,22 @@ export default async function WorkflowEditorPage(props: { params: Promise<{ id: 
       )}
       {!editable && v.status === "awaiting_confirmation" && v.viewer.isInitiatorSide && <Alert tone="info">Sent to {v.other.orgName}. The workflows are locked while they review them.</Alert>}
 
-      <div className="gap-6 lg:grid lg:grid-cols-[15rem_minmax(0,1fr)] xl:grid-cols-[15rem_minmax(0,1fr)_21rem]">
-        <aside aria-label="Workflow list" className="mb-6 rounded-panel border border-line bg-surface p-2 lg:mb-0 lg:self-start">
-          <WorkflowList workflows={v.workflows} words={v.words} selected={wf?.id} base={base} options={options} editable={editable} />
+      <div className="gap-4 lg:grid lg:grid-cols-[14rem_minmax(0,1fr)] xl:grid-cols-[14rem_minmax(0,1fr)_20rem]">
+        <aside aria-label="Workflow list" className="mb-4 rounded-panel border border-line bg-surface p-1.5 lg:mb-0 lg:self-start">
+          <WorkflowListToggle count={v.workflows.length} current={wf ? triggerSentence(wf, v.words) : ""}>
+            <WorkflowList workflows={v.workflows} words={v.words} selected={wf?.id} base={base} options={options} editable={editable} />
+          </WorkflowListToggle>
         </aside>
         <div className="min-w-0">
           {wf ? (
             <>
               <Canvas workflow={wf} words={v.words} base={base} selected={sp.s} options={options} editable={editable} />
-              {editable && wf.steps.length > 0 && <div className="mt-4"><AddStepButton options={options} workflowId={wf.id} variant="block" label="Add a step at the end" /></div>}
+              {editable && wf.steps.length > 0 && <div className="mt-2"><AddStepButton options={options} workflowId={wf.id} variant="block" label="Add a step at the end" /></div>}
             </>
           ) : (
             <p className="text-small text-fg-secondary">No workflows.</p>
           )}
-          {v.status === "draft" && v.viewer.isInitiatorSide && <div className="mt-6"><ButtonLink href={`${base}/agreement`} variant="secondary">Read as agreement</ButtonLink></div>}
+          {v.status === "draft" && v.viewer.isInitiatorSide && <div className="mt-4"><ButtonLink href={`${base}/agreement`} variant="secondary">Read as agreement</ButtonLink></div>}
         </div>
         <PropertyPane open={Boolean(selection)} title={sheetTitle} closeHref={`${base}?w=${wf?.id ?? ""}`}>{panel}</PropertyPane>
       </div>

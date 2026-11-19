@@ -14,7 +14,8 @@ export interface LedgerFigures {
  * The signature element (design system §1): the engagement's financial position at a glance.
  * Desktop: one row with hairline dividers. Mobile: two columns.
  */
-export function LedgerStrip({ figures, currency = "NGN" }: { figures: LedgerFigures; currency?: Currency }) {
+export function LedgerStrip({ figures, currency = "NGN", compact = false }: { figures: LedgerFigures; currency?: Currency; compact?: boolean }) {
+  if (compact) return <CompactLedger figures={figures} currency={currency} />;
   const cells: Array<{ label: string; value: bigint; primary?: boolean }> = [
     { label: "Agreed", value: figures.agreed, primary: true },
     { label: "Paid", value: figures.paid, primary: true },
@@ -62,6 +63,32 @@ export function LedgerStrip({ figures, currency = "NGN" }: { figures: LedgerFigu
           )}
         </p>
       )}
+    </section>
+  );
+}
+
+/**
+ * Compact strip for the engagement header: the same figures in one small row so the workspace
+ * below stays visible. Wraps instead of overflowing on narrow screens.
+ */
+function CompactLedger({ figures, currency }: { figures: LedgerFigures; currency: Currency }) {
+  const cells: Array<{ label: string; value: bigint }> = [
+    { label: "Agreed", value: figures.agreed },
+    { label: "Paid", value: figures.paid },
+    { label: "Outstanding", value: figures.outstanding },
+  ];
+  if (figures.due !== undefined) cells.push({ label: "Due now", value: figures.due });
+  if (figures.disputed !== undefined) cells.push({ label: "Disputed", value: figures.disputed });
+  return (
+    <section aria-label="Financial position" className="rounded-panel border border-line bg-raised">
+      <dl className="flex flex-wrap divide-line [&>div]:border-line">
+        {cells.map((c, i) => (
+          <div key={c.label} className={"min-w-0 px-3 py-1.5 " + (i > 0 ? "border-l" : "")}>
+            <dt className="text-caption text-fg-muted">{c.label}</dt>
+            <dd><MoneyFigure amountMinor={c.value} currency={currency} className="text-small font-semibold" /></dd>
+          </div>
+        ))}
+      </dl>
     </section>
   );
 }
