@@ -14,6 +14,7 @@ import {
   createDraft,
   getEngagementView,
   isCounterpartyAnywhere,
+  moveCommitment,
   listEngagementsForActor,
   previewEngagementInvitation,
   removeCommitment,
@@ -130,6 +131,22 @@ describe("editing the draft and the no-empty-engagement rule (FR-COM, FR-ENG-12)
     const v = await getEngagementView(db, actor, id);
     expect(v.items.find((c) => c.id === concepts)?.priceMinor).toBe(65_000_000n);
     expect(v.summary.agreedMinor).toBe(155_000_000n);
+  });
+});
+
+describe("step flow ordering (D-65)", () => {
+  it("moves steps up and down in the draft, ignores moves past the edge, and is locked once sent", async () => {
+    const { actor, workspaceId } = await payeeWithWorkspace("order");
+    const { id, concepts } = await readyDraft(actor, workspaceId, "order-client@client.ng");
+    const titles = async () => (await getEngagementView(db, actor, id)).items.map((c) => c.title);
+    expect((await titles()).slice(0, 2)).toEqual(["Three concepts", "Launch assets"]);
+    await moveCommitment(db, actor, id, concepts, "down");
+    expect((await titles()).slice(0, 2)).toEqual(["Launch assets", "Three concepts"]);
+    await moveCommitment(db, actor, id, concepts, "up");
+    await moveCommitment(db, actor, id, concepts, "up"); // already first: no-op
+    expect((await titles())[0]).toBe("Three concepts");
+    await submitForConfirmation(db, actor, id);
+    expect((await code(moveCommitment(db, actor, id, concepts, "down"))).code).toBe("CONFLICT");
   });
 });
 

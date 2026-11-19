@@ -28,6 +28,8 @@ export function describeEvent(type: string, data: Record<string, unknown>): stri
       return `updated "${String(data.title)}" in the draft.`;
     case "draft.commitment_removed":
       return `removed "${String(data.title)}" from the draft.`;
+    case "draft.step_moved":
+      return `moved a step ${String(data.direction)} in the draft.`;
     case "draft.response_windows_updated":
       return "updated the response times.";
     case "baseline.submitted":

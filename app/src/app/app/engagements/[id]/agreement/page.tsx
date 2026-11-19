@@ -2,7 +2,7 @@ import { getDb } from "@/server/db/client";
 import { requireActor } from "@/server/auth/session";
 import { getEngagementView } from "@/server/modules/engagements/service";
 import { submissionWarnings } from "@/domain/baseline";
-import { CommitmentSections } from "@/components/engagement/commitment-sections";
+import { StepFlow } from "@/components/engagement/step-flow";
 import { formatDate } from "@/components/engagement/format";
 import { ResponsePanel } from "@/components/engagement/response-panel";
 import { Alert } from "@/components/ui/alert";
@@ -45,7 +45,7 @@ export default async function AgreementPage(props: { params: Promise<{ id: strin
 
       {v.can.respond && last && <ResponsePanel engagementId={id} submissionId={last.id} orgName={v.me.orgName} respondBy={formatDate(last.respondBy)} />}
 
-      <CommitmentSections engagementId={id} items={v.items} editable={editable} payerName={payer.orgName} payeeName={payee.orgName} />
+      <StepFlow engagementId={id} items={v.items} editable={editable} payerName={payer.orgName} payeeName={payee.orgName} />
 
       <div className="grid items-start gap-6 xl:grid-cols-2">
         <Panel title="Totals">

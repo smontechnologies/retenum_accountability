@@ -460,3 +460,9 @@ A UI slice is only done when the design system §11 checklist passes: tokens and
 3. `revalidatePath` was given a literal URL with `type: "layout"`, so the engagement header didn't refresh after actions. It now uses the route pattern `/app/engagements/[id]`, per the Next.js docs.
 4. One-off "sent" and "confirmed" messages tied to the URL could contradict the real status after a reload. They now show only when the status matches.
 5. Remove buttons on every draft row were visually loud. They're now quiet buttons with a trash icon; the confirmation stays destructive.
+
+### Engagement step flow (19 Nov 2026, founder request, D-65)
+
+- **Built:** the Agreement editor is now a Bubble-style step flow (`step-flow.tsx`, `add-step-menu.tsx`): numbered steps; dependent payments nested under their trigger; per-step "+" ("Payment when confirmed", "Payment when accepted"); "+ Add step" type menu; draft-only reorder (`moveCommitment`, audited `draft.step_moved`); the same flow read-only for the counterparty. The three-list component was removed.
+- **Not built (recorded as FR-COM-07, planned):** "only when" conditions and private automations. Not faked in the UI.
+- **Tests run:** integration +1 (reorder up/down, edge no-op, locked after sending) → engagements file 10/10. UJ-2 rewritten for the flow (add-step menu, nested payments, reorder), **passed on mobile and desktop** including the design gate on the add-step menu. Screenshots reviewed (desktop editor, mobile menu).

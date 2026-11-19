@@ -18,6 +18,16 @@ async function shot(page: Page, name: string, project: string) {
   if (process.env.SHOTS === "1") await page.screenshot({ path: `../.data/shots/${name}-${project}.png`, fullPage: true });
 }
 
+/** "+ Add step" → choose a step type → fill the drawer. */
+async function addStep(page: Page, type: string, fill: (d: ReturnType<Page["getByRole"]>) => Promise<void>) {
+  await page.getByRole("button", { name: "Add step" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: new RegExp(`^${type}`) }).click();
+  const drawer = page.getByRole("dialog");
+  await fill(drawer);
+  await drawer.getByRole("button", { name: "Add to agreement" }).click();
+  await expect(page.getByRole("dialog")).toBeHidden();
+}
+
 async function addItem(page: Page, button: RegExp, fill: (d: ReturnType<Page["getByRole"]>) => Promise<void>, submit = "Add to agreement") {
   await page.getByRole("button", { name: button }).first().click();
   const drawer = page.getByRole("dialog");
@@ -45,32 +55,44 @@ test("UJ-2: create an engagement, send it, the client signs in with a code, asks
   await expect(page.getByText("Add at least one deliverable: what will be delivered.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Send for confirmation" })).toBeDisabled();
 
-  await addItem(page, /Add deliverable/, async (d) => {
+  // Bubble-style step flow (D-65): "+ Add step" picks the step type...
+  await addStep(page, "Deliverable", async (d) => {
     await d.getByLabel("What will be delivered").fill("Three concepts");
     await d.getByLabel("Price (₦)").fill("600000");
     await d.getByLabel("Definition of done").fill("Three concepts delivered as PDF");
   });
-  await addItem(page, /Add deliverable/, async (d) => {
+  await addStep(page, "Deliverable", async (d) => {
     await d.getByLabel("What will be delivered").fill("Launch assets");
     await d.getByLabel("Price (₦)").fill("900,000");
   });
-  await addItem(page, /Add payment/, async (d) => {
+  // ...and the "+" under a step adds what happens because of it.
+  await addItem(page, /Payment when confirmed/, async (d) => {
     await d.getByLabel("Payment name").fill("Deposit");
     await d.getByLabel("Amount (₦)").fill("600000");
   });
-  await addItem(page, /Add payment/, async (d) => {
-    await d.getByLabel("Payment name").fill("Balance");
-    await d.getByLabel("Amount (₦)").fill("900000");
-    await d.getByLabel("When it becomes due").selectOption("on_acceptance");
-    await d.getByLabel("Which deliverable").selectOption({ label: "Launch assets" });
-  });
+  const launchStep = page.getByRole("listitem").filter({ has: page.getByRole("heading", { name: /Launch assets/ }) });
+  await launchStep.getByRole("button", { name: /Payment when accepted/ }).click();
+  const drawer = page.getByRole("dialog");
+  await expect(drawer).toContainText('Becomes due when "Launch assets" is accepted.');
+  await drawer.getByLabel("Payment name").fill("Balance");
+  await drawer.getByLabel("Amount (₦)").fill("900000");
+  await drawer.getByRole("button", { name: "Add to agreement" }).click();
+  await expect(page.getByRole("dialog")).toBeHidden();
+  await expect(launchStep).toContainText("Balance becomes due when this is accepted");
+  await expect(page.getByRole("listitem").filter({ has: page.getByRole("heading", { name: /Agreement confirmed/ }) })).toContainText("Deposit becomes due when the agreement is confirmed");
+
+  // Reorder while it's a draft.
+  await page.getByRole("button", { name: 'Move "Launch assets" up' }).click();
+  await expect(page.getByRole("heading", { level: 3 }).nth(1)).toContainText("Launch assets");
+  await page.getByRole("button", { name: 'Move "Launch assets" down' }).click();
+  await expect(page.getByRole("heading", { level: 3 }).nth(1)).toContainText("Three concepts");
   await expect(page.getByRole("region", { name: "Financial position" })).toContainText("₦1,500,000.00");
   await expect(page.getByText(/Before you can send this/)).toHaveCount(0);
   await expectDesignGate(page, "draft agreement editor");
   await shot(page, "s2-draft-editor", p);
-  await page.getByRole("button", { name: /Add deliverable/ }).first().click();
-  await expectDesignGate(page, "add deliverable drawer");
-  await shot(page, "s2-drawer", p);
+  await page.getByRole("button", { name: "Add step" }).click();
+  await expectDesignGate(page, "add step menu");
+  await shot(page, "s2-add-step-menu", p);
   await page.getByRole("dialog").getByRole("button", { name: "Close" }).click();
 
   await page.getByRole("button", { name: "Send for confirmation" }).click();
@@ -88,7 +110,7 @@ test("UJ-2: create an engagement, send it, the client signs in with a code, asks
   await client.getByLabel("Sign-in code").fill(await codeFromEmail(clientEmail));
   await client.getByRole("button", { name: "Continue" }).click();
   await expect(client.getByRole("heading", { name: "Your response" })).toBeVisible();
-  await expect(client.getByText("Three concepts", { exact: true })).toBeVisible();
+  await expect(client.getByRole("heading", { name: /Three concepts/ })).toBeVisible();
   await expectDesignGate(client, "counterparty review and response");
   await shot(client, "s2-client-review", p);
 
@@ -109,7 +131,7 @@ test("UJ-2: create an engagement, send it, the client signs in with a code, asks
   // Payee revises and resends.
   await page.goto(page.url().replace(/\?.*$/, "") + "/agreement");
   await expect(page.getByText("Kola Foods asked for changes")).toBeVisible();
-  await addItem(page, /Add deliverable/, async (d) => {
+  await addStep(page, "Deliverable", async (d) => {
     await d.getByLabel("What will be delivered").fill("Social cut-downs");
     await d.getByLabel("Price (₦)").fill("0");
   });
@@ -120,7 +142,7 @@ test("UJ-2: create an engagement, send it, the client signs in with a code, asks
   // Client confirms the revised version from the new link.
   await client.goto(await linkFromEmail(clientEmail, /asked you to confirm/));
   await client.getByRole("button", { name: "Review the agreement" }).click();
-  await expect(client.getByText("Social cut-downs", { exact: true })).toBeVisible();
+  await expect(client.getByRole("heading", { name: /Social cut-downs/ })).toBeVisible();
   await client.getByRole("checkbox").check();
   await client.getByRole("button", { name: "Confirm agreement" }).click();
   await expect(client.getByText("Agreement confirmed")).toBeVisible();

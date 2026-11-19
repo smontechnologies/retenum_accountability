@@ -13,6 +13,7 @@ import {
   acceptEngagementInvitation,
   addCommitment,
   createDraft,
+  moveCommitment,
   previewEngagementInvitation,
   removeCommitment,
   resendInvitation,
@@ -78,6 +79,18 @@ export async function removeCommitmentAction(_: FormState, data: FormData): Prom
   }
   refresh(engagementId);
   return { status: "success", message: "Item removed." };
+}
+
+export async function moveStepAction(_: FormState, data: FormData): Promise<FormState> {
+  const actor = await requireActor();
+  const engagementId = str(data, "engagementId");
+  try {
+    await moveCommitment(getDb(), actor, engagementId, str(data, "commitmentId"), str(data, "direction") === "up" ? "up" : "down");
+  } catch (err) {
+    return toState(err);
+  }
+  refresh(engagementId);
+  return { status: "success" };
 }
 
 export async function saveResponseWindowsAction(_: FormState, data: FormData): Promise<FormState> {

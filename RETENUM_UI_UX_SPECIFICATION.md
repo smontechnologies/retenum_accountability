@@ -178,6 +178,23 @@ Every table becomes a stacked list at < 768: one row becomes a block with its ma
 4. **Pending state:** the button shows "Confirming…" until the server responds. Nothing appears confirmed before the server acknowledges it (PWA-06).
 5. **Result:** a toast ("Agreement confirmed"), the status badge changes to *Confirmed / Active v1*, and a timeline entry appears.
 
+### 6.1a The agreement as a step flow (D-65)
+
+```
+① Agreement confirmed
+   ↳ Deposit ₦600,000 becomes due when the agreement is confirmed
+   + Payment when confirmed
+② Deliverable · Three concepts                      ₦600,000
+   Done when: …                     Edit · Remove · ↓
+   + Payment when accepted
+③ Deliverable · Launch assets                       ₦900,000
+   ↳ Balance ₦900,000 becomes due when this is accepted
+   + Payment when accepted
+[ + Add step ]  → Deliverable · What a party provides · Payment on a date · Payment when requested
+```
+
+The order is part of the agreement. Draft-only controls are Edit, Remove, ↑ and ↓. The counterparty sees the same flow without controls.
+
 ### 6.2 Responding to a change: three dimensions, never merged (§19 of the PRD)
 
 The change detail shows **Was → Now** (side by side on desktop, stacked on mobile), the reason, and the price, time and schedule effects. Below that are **three labelled response groups**, each with its own state badge and controls:

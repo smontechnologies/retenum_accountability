@@ -440,6 +440,27 @@ export async function removeCommitment(db: Database, actor: Actor, engagementId:
   });
 }
 
+/**
+ * Reorder a step in the draft flow (swap with its neighbour). Draft only: once confirmed, the order is
+ * part of the agreement and changes only through a confirmed change (D-65).
+ */
+export async function moveCommitment(db: Database, actor: Actor, engagementId: string, commitmentId: string, direction: "up" | "down") {
+  const { viewer } = await authorise(db, actor, engagementId, "engagement.edit_draft");
+  await tx(db, async (t) => {
+    const rows = await t.select({ id: commitments.id, position: commitments.position }).from(commitments).where(eq(commitments.engagementId, engagementId)).orderBy(asc(commitments.position));
+    const i = rows.findIndex((r) => r.id === commitmentId);
+    if (i < 0) throw notFound("Item not found.");
+    const j = direction === "up" ? i - 1 : i + 1;
+    if (j < 0 || j >= rows.length) return; // already at the edge: nothing to do
+    const a = rows[i]!;
+    const b = rows[j]!;
+    await t.update(commitments).set({ position: b.position }).where(eq(commitments.id, a.id));
+    await t.update(commitments).set({ position: a.position }).where(eq(commitments.id, b.id));
+    await t.update(engagements).set({ updatedAt: new Date() }).where(eq(engagements.id, engagementId));
+    await appendEvent(t, { engagementId, type: "draft.step_moved", actorUserId: actor.userId, actorSide: viewer.side, target: { kind: "commitment", id: commitmentId }, data: { direction } });
+  });
+}
+
 export async function updateResponseWindows(db: Database, actor: Actor, engagementId: string, input: z.input<typeof ResponseWindowsInput>) {
   const { viewer } = await authorise(db, actor, engagementId, "engagement.edit_draft");
   const w = parse(ResponseWindowsInput, input);
