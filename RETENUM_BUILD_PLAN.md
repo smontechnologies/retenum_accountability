@@ -505,7 +505,7 @@ A UI slice is only done when the design system §11 checklist passes: tokens and
 - **Review fixes from screenshots:** the amount appeared twice on step cards (removed); an empty "Days to pay" field showed 0 (now blank); the clause wording "since the trigger" became "since this workflow started".
 - **Operational:** the dev database was migrated to 0005 after stopping the dev server by PID. Stale `.next/dev/types` for the deleted routes failed the build's type check, so it was cleared.
 
-### D-67 proposal: guided start, v1 vocabulary, money guardrail (19 Nov 2026, branch `guided-start`)
+### D-67: guided start, v1 vocabulary, money guardrail (19 Nov 2026; founder approved; merged to main)
 
 - **Why:** a critique of D-66. Target customers aren't builders; a blank canvas slows the common deal shape (deposit, deliverables, balance); conditions on money let users write penalty-like terms; chaining raises the cost of W2 and Slice 3. The founder asked to see this version end to end.
 - **Built:**
