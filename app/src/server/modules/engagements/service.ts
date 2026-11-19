@@ -1,6 +1,7 @@
 import { and, asc, count, desc, eq, inArray, isNull, max, sql } from "drizzle-orm";
 import type { z } from "zod";
-import { dueByObligation, submissionProblems, summarise, type CommitmentView, type Side } from "@/domain/baseline";
+import { dueByObligation, summarise, type CommitmentView, type Side } from "@/domain/baseline";
+import { agreementClauses, commitmentsOf, sendProblems, type SentenceContext, type WorkflowView } from "@/domain/workflow";
 import { COUNTS_TOWARDS_LIMIT, nextStatus, type EngagementStatus } from "@/domain/engagement-state";
 import { formatMoney, isCurrency, money, parseAmount } from "@/domain/money";
 import { addWorkingDays } from "@/domain/working-days";
@@ -16,6 +17,8 @@ import {
   engagements,
   partyMembers,
   user,
+  workflowSteps,
+  workflows,
   workspaceMembers,
   workspaces,
   type ResponseWindows,
@@ -28,6 +31,7 @@ import { hashToken, newId, newSecretToken } from "../../lib/ids";
 import { enqueueEmail } from "../../outbox/outbox";
 import { engagementCan, type EngagementAction, type EngagementViewer } from "../../policy/engagement-policy";
 import { isPlan, PLAN_LIMITS } from "../workspaces/plans";
+import { ensureWorkflows, insertDefaultWorkflow, loadWorkflows } from "./workflows";
 import {
   BaselineResponseInput,
   CreateDraftInput,
@@ -39,10 +43,10 @@ import {
 
 export const DEFAULT_RESPONSE_WINDOWS: ResponseWindows = { baseline: 5, changes: 3, deliveries: 5, paymentConfirmations: 3 };
 
-type Tx = Database;
-const tx = <T>(db: Database, fn: (t: Tx) => Promise<T>) => db.transaction((raw) => fn(raw as unknown as Tx));
+export type Tx = Database;
+export const tx = <T>(db: Database, fn: (t: Tx) => Promise<T>) => db.transaction((raw) => fn(raw as unknown as Tx));
 
-function parse<T extends z.ZodType>(schema: T, input: unknown): z.output<T> {
+export function parse<T extends z.ZodType>(schema: T, input: unknown): z.output<T> {
   const r = schema.safeParse(input);
   if (!r.success) {
     throw validationError("Some details need fixing.", { fields: Object.fromEntries(r.error.issues.map((i) => [i.path.join("."), i.message])) });
@@ -56,10 +60,33 @@ function requireVerified(actor: Actor) {
 
 const otherSide = (s: Side): Side => (s === "payer" ? "payee" : "payer");
 
+const dateFmt = new Intl.DateTimeFormat("en-NG", { day: "numeric", month: "short", year: "numeric", timeZone: "Africa/Lagos" });
+/** Wording context for workflow sentences and clauses (domain/workflow.ts). */
+export function sentenceContext(workflowsList: WorkflowView[], payerName: string, payeeName: string): SentenceContext {
+  const items = commitmentsOf(workflowsList);
+  return {
+    commitments: new Map(items.map((c) => [c.id, c])),
+    workflows: new Map(workflowsList.map((w) => [w.id, w])),
+    payerName,
+    payeeName,
+    formatDate: (iso: string) => dateFmt.format(new Date(`${iso}T12:00:00Z`)),
+  };
+}
+
+function serialiseWorkflows(wfs: WorkflowView[]) {
+  return wfs.map((w) => ({ ...w, steps: w.steps.map((st) => ({ ...st, commitment: st.commitment ? { ...st.commitment, priceMinor: st.commitment.priceMinor === null ? null : st.commitment.priceMinor.toString() } : null })) }));
+}
+function deserialiseWorkflows(raw: unknown): WorkflowView[] {
+  return ((raw ?? []) as Array<WorkflowView & { steps: Array<{ commitment: (CommitmentView & { priceMinor: string | null }) | null }> }>).map((w) => ({
+    ...w,
+    steps: w.steps.map((st) => ({ ...(st as WorkflowView["steps"][number]), commitment: st.commitment ? { ...st.commitment, priceMinor: st.commitment.priceMinor === null ? null : BigInt(st.commitment.priceMinor) } : null })),
+  }));
+}
+
 // ------------------------------------------------------------------------------------------------
 // Loading and authorisation
 
-async function loadEngagement(db: Database, id: string, lock = false) {
+export async function loadEngagement(db: Database, id: string, lock = false) {
   if (!/^[0-9a-f-]{36}$/i.test(id)) throw notFound("Engagement not found.");
   const q = db.select().from(engagements).where(eq(engagements.id, id)).limit(1);
   const [e] = lock ? await q.for("update") : await q;
@@ -95,7 +122,7 @@ async function hasSubmission(db: Database, engagementId: string) {
   return (r?.n ?? 0) > 0;
 }
 
-async function authorise(db: Database, actor: Actor, id: string, action: EngagementAction, opts: { lock?: boolean } = {}) {
+export async function authorise(db: Database, actor: Actor, id: string, action: EngagementAction, opts: { lock?: boolean } = {}) {
   requireVerified(actor);
   const engagement = await loadEngagement(db, id, opts.lock);
   const viewer = await resolveViewer(db, actor, engagement);
@@ -165,7 +192,12 @@ export async function getEngagementView(db: Database, actor: Actor, id: string, 
   const latest = submissions[0] ?? null;
   // A counterparty looking at a draft that is being revised sees the last version sent to them.
   const showSnapshot = !viewer.isInitiatorSide && status === "draft" && latest;
-  const items = showSnapshot ? snapshotCommitments(latest.snapshot) : await loadCommitments(db, id, engagement.currentVersion);
+  if (!showSnapshot) await ensureWorkflows(db, id, engagement.currentVersion, parties.find((p) => p.isInitiator)!.side as Side);
+  const wfs = showSnapshot ? deserialiseWorkflows(latest.snapshot.workflows) : await loadWorkflows(db, id, engagement.currentVersion);
+  const items = commitmentsOf(wfs);
+  const payerName = parties.find((p) => p.side === "payer")!.orgName;
+  const payeeName = parties.find((p) => p.side === "payee")!.orgName;
+  const ctxWords = sentenceContext(wfs, payerName, payeeName);
   const summary = summarise(items);
   const confirmed = engagement.currentVersion >= 1;
   const due = dueByObligation(items, confirmed && status === "active", todayIso);
@@ -202,7 +234,10 @@ export async function getEngagementView(db: Database, actor: Actor, id: string, 
     latestSubmission: latest,
     submissions,
     invitation,
-    problems: submissionProblems(items),
+    problems: sendProblems(wfs, ctxWords),
+    workflows: wfs,
+    words: ctxWords,
+    clauses: agreementClauses(wfs, ctxWords),
     events: events.map(({ e, actorName }) => ({ ...e, actorName })),
     can: {
       editDraft: engagementCan(viewer, "engagement.edit_draft", ctx),
@@ -212,11 +247,6 @@ export async function getEngagementView(db: Database, actor: Actor, id: string, 
       respond: engagementCan(viewer, "baseline.respond", ctx),
     },
   };
-}
-
-function snapshotCommitments(snapshot: Record<string, unknown>): CommitmentView[] {
-  const items = (snapshot.commitments ?? []) as Array<CommitmentView & { priceMinor: string | null }>;
-  return items.map((c) => ({ ...c, priceMinor: c.priceMinor === null ? null : BigInt(c.priceMinor) }));
 }
 
 /** Engagements the actor can see: those of their current workspace, plus those they're a counterparty to. */
@@ -239,7 +269,7 @@ export async function listEngagementsForActor(db: Database, actor: Actor, worksp
     if (!viewer) continue;
     const subs = await hasSubmission(db, e.id);
     if (!engagementCan(viewer, "engagement.view", { status: e.status as EngagementStatus, hasSubmission: subs })) continue;
-    const items = await loadCommitments(db, e.id, e.currentVersion);
+    const items = commitmentsOf(await loadWorkflows(db, e.id, e.currentVersion));
     const other = parties.find((p) => p.engagementId === e.id && p.side !== viewer.side)!;
     const needsMe =
       (e.status === "awaiting_confirmation" && !viewer.isInitiatorSide && viewer.authority === "approver") ||
@@ -312,6 +342,7 @@ export async function createDraft(db: Database, actor: Actor, input: z.input<typ
         repEmail: data.counterpartyEmail,
       },
     ]);
+    await insertDefaultWorkflow(t, id, data.initiatorSide);
     await appendEvent(t, {
       engagementId: id,
       type: "engagement.draft_created",
@@ -323,7 +354,7 @@ export async function createDraft(db: Database, actor: Actor, input: z.input<typ
   });
 }
 
-async function nextPosition(t: Tx, engagementId: string) {
+export async function nextPosition(t: Tx, engagementId: string) {
   const [r] = await t.select({ m: max(commitments.position) }).from(commitments).where(eq(commitments.engagementId, engagementId));
   return (r?.m ?? -1) + 1;
 }
@@ -338,12 +369,12 @@ function amount(raw: string, currency: string, field: string): bigint {
   }
 }
 
-type CommitmentInput =
+export type CommitmentInput =
   | ({ kind: "deliverable" } & z.input<typeof DeliverableInput>)
   | ({ kind: "party_obligation" } & z.input<typeof PartyObligationInput>)
   | ({ kind: "payment_obligation" } & z.input<typeof PaymentObligationInput>);
 
-function revisionValues(kind: CommitmentInput["kind"], input: CommitmentInput, currency: string, items: CommitmentView[]) {
+export function revisionValues(kind: CommitmentInput["kind"], input: CommitmentInput, currency: string, items: CommitmentView[]) {
   if (kind === "deliverable") {
     const d = parse(DeliverableInput, input);
     return {
@@ -385,82 +416,6 @@ function revisionValues(kind: CommitmentInput["kind"], input: CommitmentInput, c
   };
 }
 
-export async function addCommitment(db: Database, actor: Actor, engagementId: string, input: CommitmentInput) {
-  const { engagement, viewer } = await authorise(db, actor, engagementId, "engagement.edit_draft");
-  const items = await loadCommitments(db, engagementId, 0);
-  const { owedBySide, values } = revisionValues(input.kind, input, engagement.currency, items);
-  const owed: Side = input.kind === "deliverable" ? "payee" : owedBySide!; // deliverables are always owed by the payee
-  return tx(db, async (t) => {
-    const id = newId();
-    await t.insert(commitments).values({ id, engagementId, kind: input.kind, owedBySide: owed, position: await nextPosition(t, engagementId) });
-    await t.insert(commitmentRevisions).values({ id: newId(), commitmentId: id, versionFrom: 0, ...values });
-    await t.update(engagements).set({ updatedAt: new Date() }).where(eq(engagements.id, engagementId));
-    await appendEvent(t, {
-      engagementId,
-      type: "draft.commitment_added",
-      actorUserId: actor.userId,
-      actorSide: viewer.side,
-      target: { kind: "commitment", id },
-      data: { kind: input.kind, title: values.title, priceMinor: "priceMinor" in values && values.priceMinor !== undefined ? String(values.priceMinor) : null },
-    });
-    return { id };
-  });
-}
-
-export async function updateCommitment(db: Database, actor: Actor, engagementId: string, commitmentId: string, input: CommitmentInput) {
-  const { engagement, viewer } = await authorise(db, actor, engagementId, "engagement.edit_draft");
-  const items = await loadCommitments(db, engagementId, 0);
-  const existing = items.find((c) => c.id === commitmentId);
-  if (!existing || existing.kind !== input.kind) throw notFound("Item not found.");
-  const { owedBySide, values } = revisionValues(input.kind, input, engagement.currency, items.filter((c) => c.id !== commitmentId));
-  await tx(db, async (t) => {
-    // Draft revisions (version 0) are edited in place: nothing has been agreed yet, and every
-    // submission is preserved as a snapshot.
-    await t.update(commitmentRevisions).set(values).where(and(eq(commitmentRevisions.commitmentId, commitmentId), eq(commitmentRevisions.versionFrom, 0)));
-    if (input.kind === "party_obligation" && owedBySide) await t.update(commitments).set({ owedBySide }).where(eq(commitments.id, commitmentId));
-    await t.update(engagements).set({ updatedAt: new Date() }).where(eq(engagements.id, engagementId));
-    await appendEvent(t, { engagementId, type: "draft.commitment_updated", actorUserId: actor.userId, actorSide: viewer.side, target: { kind: "commitment", id: commitmentId }, data: { title: values.title } });
-  });
-}
-
-export async function removeCommitment(db: Database, actor: Actor, engagementId: string, commitmentId: string) {
-  const { viewer } = await authorise(db, actor, engagementId, "engagement.edit_draft");
-  const items = await loadCommitments(db, engagementId, 0);
-  const existing = items.find((c) => c.id === commitmentId);
-  if (!existing) throw notFound("Item not found.");
-  const dependants = items.filter((c) => c.linkedCommitmentId === commitmentId);
-  if (dependants.length > 0) {
-    throw conflict(`"${dependants[0]!.title}" becomes due when this is accepted. Change or remove that payment first.`);
-  }
-  await tx(db, async (t) => {
-    await t.delete(commitmentRevisions).where(eq(commitmentRevisions.commitmentId, commitmentId));
-    await t.delete(commitments).where(eq(commitments.id, commitmentId));
-    await t.update(engagements).set({ updatedAt: new Date() }).where(eq(engagements.id, engagementId));
-    await appendEvent(t, { engagementId, type: "draft.commitment_removed", actorUserId: actor.userId, actorSide: viewer.side, target: { kind: "commitment", id: commitmentId }, data: { title: existing.title } });
-  });
-}
-
-/**
- * Reorder a step in the draft flow (swap with its neighbour). Draft only: once confirmed, the order is
- * part of the agreement and changes only through a confirmed change (D-65).
- */
-export async function moveCommitment(db: Database, actor: Actor, engagementId: string, commitmentId: string, direction: "up" | "down") {
-  const { viewer } = await authorise(db, actor, engagementId, "engagement.edit_draft");
-  await tx(db, async (t) => {
-    const rows = await t.select({ id: commitments.id, position: commitments.position }).from(commitments).where(eq(commitments.engagementId, engagementId)).orderBy(asc(commitments.position));
-    const i = rows.findIndex((r) => r.id === commitmentId);
-    if (i < 0) throw notFound("Item not found.");
-    const j = direction === "up" ? i - 1 : i + 1;
-    if (j < 0 || j >= rows.length) return; // already at the edge: nothing to do
-    const a = rows[i]!;
-    const b = rows[j]!;
-    await t.update(commitments).set({ position: b.position }).where(eq(commitments.id, a.id));
-    await t.update(commitments).set({ position: a.position }).where(eq(commitments.id, b.id));
-    await t.update(engagements).set({ updatedAt: new Date() }).where(eq(engagements.id, engagementId));
-    await appendEvent(t, { engagementId, type: "draft.step_moved", actorUserId: actor.userId, actorSide: viewer.side, target: { kind: "commitment", id: commitmentId }, data: { direction } });
-  });
-}
-
 export async function updateResponseWindows(db: Database, actor: Actor, engagementId: string, input: z.input<typeof ResponseWindowsInput>) {
   const { viewer } = await authorise(db, actor, engagementId, "engagement.edit_draft");
   const w = parse(ResponseWindowsInput, input);
@@ -473,9 +428,13 @@ export async function updateResponseWindows(db: Database, actor: Actor, engageme
 // ------------------------------------------------------------------------------------------------
 // Submission, invitation and response
 
-function snapshotOf(e: typeof engagements.$inferSelect, parties: Array<typeof engagementParties.$inferSelect>, items: CommitmentView[], seq: number) {
+function snapshotOf(e: typeof engagements.$inferSelect, parties: Array<typeof engagementParties.$inferSelect>, wfs: WorkflowView[], seq: number) {
+  const items = commitmentsOf(wfs);
   const s = summarise(items);
+  const words = sentenceContext(wfs, parties.find((p) => p.side === "payer")!.orgName, parties.find((p) => p.side === "payee")!.orgName);
   return {
+    workflows: serialiseWorkflows(wfs),
+    clauses: agreementClauses(wfs, words),
     seq,
     title: e.title,
     description: e.description,
@@ -511,10 +470,11 @@ export async function submitForConfirmation(db: Database, actor: Actor, engageme
     const status = engagement.status as EngagementStatus;
     const to = nextStatus(status, "submit");
     if (!to) throw conflict("This engagement can't be sent for confirmation now.");
-    const items = await loadCommitments(t, engagementId, 0);
-    const problems = submissionProblems(items);
-    if (problems.length > 0) throw new AppError("CONFLICT", "This engagement isn't ready to send yet.", { problems });
     const parties = await t.select().from(engagementParties).where(eq(engagementParties.engagementId, engagementId));
+    const wfs = await loadWorkflows(t, engagementId, 0);
+    const items = commitmentsOf(wfs);
+    const problems = sendProblems(wfs, sentenceContext(wfs, parties.find((p) => p.side === "payer")!.orgName, parties.find((p) => p.side === "payee")!.orgName));
+    if (problems.length > 0) throw new AppError("CONFLICT", "This engagement isn't ready to send yet.", { problems });
     const counterparty = parties.find((p) => !p.isInitiator)!;
     const [{ m } = { m: 0 }] = await t.select({ m: max(baselineSubmissions.seq) }).from(baselineSubmissions).where(eq(baselineSubmissions.engagementId, engagementId));
     const seq = (m ?? 0) + 1;
@@ -524,7 +484,7 @@ export async function submitForConfirmation(db: Database, actor: Actor, engageme
       id: submissionId,
       engagementId,
       seq,
-      snapshot: snapshotOf(engagement, parties, items, seq),
+      snapshot: snapshotOf(engagement, parties, wfs, seq),
       status: "open",
       submittedBy: actor.userId,
       submittedAt: now,
@@ -614,6 +574,11 @@ export async function respondToBaseline(db: Database, actor: Actor, engagementId
       const ids = (await t.select({ id: commitments.id }).from(commitments).where(eq(commitments.engagementId, engagementId))).map((r) => r.id);
       if (ids.length) await t.update(commitmentRevisions).set({ versionFrom: 1 }).where(and(inArray(commitmentRevisions.commitmentId, ids), eq(commitmentRevisions.versionFrom, 0)));
       await t.insert(engagementVersions).values({ engagementId, version: 1, cause: "baseline", createdAt: now });
+      const wids = (await t.select({ id: workflows.id }).from(workflows).where(eq(workflows.engagementId, engagementId))).map((r) => r.id);
+      if (wids.length) {
+        await t.update(workflows).set({ versionFrom: 1 }).where(and(inArray(workflows.id, wids), eq(workflows.versionFrom, 0)));
+        await t.update(workflowSteps).set({ versionFrom: 1 }).where(and(inArray(workflowSteps.workflowId, wids), eq(workflowSteps.versionFrom, 0)));
+      }
     } else {
       await t.update(engagements).set({ status: to, updatedAt: now }).where(eq(engagements.id, engagementId));
       if (data.response === "decline") {

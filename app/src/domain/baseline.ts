@@ -4,7 +4,8 @@
  */
 export type CommitmentKind = "deliverable" | "party_obligation" | "payment_obligation";
 export type Side = "payer" | "payee";
-export type Trigger = "on_confirmation" | "on_date" | "on_acceptance" | "on_request";
+/** on_workflow: due when its workflow runs (decided by the W2 engine from the workflow trigger). */
+export type Trigger = "on_confirmation" | "on_date" | "on_acceptance" | "on_request" | "on_workflow";
 
 export interface CommitmentView {
   id: string;
@@ -113,4 +114,5 @@ export const TRIGGER_LABEL: Record<Trigger, string> = {
   on_date: "On a date",
   on_acceptance: "When a deliverable is accepted",
   on_request: "When payment is requested",
+  on_workflow: "When its workflow runs",
 };

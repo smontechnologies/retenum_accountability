@@ -4,25 +4,22 @@ import { createTestDb } from "../helpers/db";
 import { createUser } from "../helpers/users";
 import { createAuth, type Auth } from "@/server/auth/auth";
 import type { Database } from "@/server/db/client";
-import { commitmentRevisions, engagementVersions, engagements, outbox, user, workspaces } from "@/server/db/schema";
+import { commitmentRevisions, engagementVersions, engagements, outbox, user, workflowSteps, workflows, workspaces } from "@/server/db/schema";
 import { verifyEngagementChain } from "@/server/events/append";
 import type { Actor } from "@/server/lib/actor";
 import { AppError } from "@/server/lib/errors";
 import {
   acceptEngagementInvitation,
-  addCommitment,
   createDraft,
   getEngagementView,
   isCounterpartyAnywhere,
-  moveCommitment,
   listEngagementsForActor,
   previewEngagementInvitation,
-  removeCommitment,
   respondToBaseline,
   submitForConfirmation,
-  updateCommitment,
   withdrawEngagement,
 } from "@/server/modules/engagements/service";
+import { addStep, addWorkflow, moveStep, moveWorkflow, removeStep, removeWorkflow, setStepCondition, updateStep, updateWorkflowTrigger } from "@/server/modules/engagements/workflows";
 import { createWorkspace } from "@/server/modules/workspaces/service";
 
 let db: Database;
@@ -61,21 +58,25 @@ async function payeeWithWorkspace(label: string, plan = "pro") {
   return { actor, workspaceId: id };
 }
 
+/**
+ * Builds a complete agreement through the workflow API, as the editor does:
+ *   "When the agreement is confirmed": Deposit due, start Three concepts, start Launch assets, client provides brand assets
+ *   "When Launch assets is accepted": Balance due + notify payee
+ */
 async function readyDraft(actor: Actor, workspaceId: string, counterpartyEmail: string) {
-  const { id } = await createDraft(db, actor, {
-    workspaceId,
-    title: "Q1 Campaign",
-    initiatorSide: "payee",
-    counterpartyOrg: "Kola Foods",
-    counterpartyName: "Ngozi Okafor",
-    counterpartyEmail,
-  });
-  const { id: concepts } = await addCommitment(db, actor, id, { kind: "deliverable", title: "Three concepts", price: "600,000", definitionOfDone: "3 concepts as PDF" });
-  await addCommitment(db, actor, id, { kind: "deliverable", title: "Launch assets", price: "900000" });
-  await addCommitment(db, actor, id, { kind: "party_obligation", owedBySide: "payer", title: "Brand assets to agency", dueDate: "2027-01-10" });
-  await addCommitment(db, actor, id, { kind: "payment_obligation", title: "Deposit", amount: "600000", trigger: "on_confirmation" });
-  await addCommitment(db, actor, id, { kind: "payment_obligation", title: "Balance", amount: "900000", trigger: "on_acceptance", linkedCommitmentId: concepts });
-  return { id, concepts };
+  const { id } = await createDraft(db, actor, { workspaceId, title: "Q1 Campaign", initiatorSide: "payee", counterpartyOrg: "Kola Foods", counterpartyName: "Ngozi Okafor", counterpartyEmail });
+  const main = (await getEngagementView(db, actor, id)).workflows[0]!.id;
+  await addStep(db, actor, id, main, "make_payment_due", { title: "Deposit", amount: "600000", termsDays: "7" });
+  const { id: conceptsStep } = await addStep(db, actor, id, main, "start_deliverable", { title: "Three concepts", price: "600,000", definitionOfDone: "3 concepts as PDF" });
+  const { id: launchStep } = await addStep(db, actor, id, main, "start_deliverable", { title: "Launch assets", price: "900000" });
+  await addStep(db, actor, id, main, "party_provides", { owedBySide: "payer", title: "Brand assets to agency", dueDate: "2027-01-10" });
+  const v = await getEngagementView(db, actor, id);
+  const concepts = v.workflows[0]!.steps.find((x) => x.id === conceptsStep)!.commitment!.id;
+  const launch = v.workflows[0]!.steps.find((x) => x.id === launchStep)!.commitment!.id;
+  const { id: onLaunch } = await addWorkflow(db, actor, id, { triggerType: "deliverable_accepted", commitmentId: launch });
+  await addStep(db, actor, id, onLaunch, "make_payment_due", { title: "Balance", amount: "900000" });
+  await addStep(db, actor, id, onLaunch, "notify", { who: "payee", message: "Balance is due" });
+  return { id, concepts, launch, main, onLaunch, conceptsStep };
 }
 
 describe("creating drafts (FR-ENG-01..03, FR-WS-07, FR-ENG-12)", () => {
@@ -109,44 +110,85 @@ describe("creating drafts (FR-ENG-01..03, FR-WS-07, FR-ENG-12)", () => {
   });
 });
 
-describe("editing the draft and the no-empty-engagement rule (FR-COM, FR-ENG-12)", () => {
-  it("cannot be sent while empty, and explains why", async () => {
+describe("workflows: building the agreement (D-66, FR-WF-01…06, FR-ENG-12)", () => {
+  it("starts every engagement with one empty 'agreement confirmed' workflow and can't be sent blank", async () => {
     const { actor, workspaceId } = await payeeWithWorkspace("empty");
     const { id } = await createDraft(db, actor, { workspaceId, title: "Empty", initiatorSide: "payee", counterpartyOrg: "C", counterpartyName: "C", counterpartyEmail: "c@c.ng" });
+    const v = await getEngagementView(db, actor, id);
+    expect(v.workflows).toHaveLength(1);
+    expect(v.workflows[0]).toMatchObject({ triggerType: "agreement_confirmed", steps: [] });
     const err = await code(submitForConfirmation(db, actor, id));
     expect((err.details as { problems: string[] }).problems).toEqual([
-      "Add at least one deliverable: what will be delivered.",
-      "Add a payment schedule: at least one payment and when it becomes due.",
+      "Add a step that starts a deliverable: what will be delivered.",
+      "Add a step that makes a payment due.",
+      "Workflow “When the agreement is confirmed” has no steps. Add a step or remove the workflow.",
     ]);
   });
 
-  it("validates commitments and protects linked items", async () => {
-    const { actor, workspaceId } = await payeeWithWorkspace("edit");
-    const { id, concepts } = await readyDraft(actor, workspaceId, "edit-client@client.ng");
-    expect((await code(addCommitment(db, actor, id, { kind: "deliverable", title: "Bad", price: "12.345" }))).details).toMatchObject({ fields: { price: expect.any(String) } });
-    expect((await code(addCommitment(db, actor, id, { kind: "payment_obligation", title: "P", amount: "1", trigger: "on_date" }))).details).toMatchObject({ fields: { triggerDate: expect.any(String) } });
-    expect((await code(addCommitment(db, actor, id, { kind: "payment_obligation", title: "P", amount: "1", trigger: "on_acceptance" }))).details).toMatchObject({ fields: { linkedCommitmentId: expect.any(String) } });
-    expect((await code(removeCommitment(db, actor, id, concepts))).message).toMatch(/Balance/);
-    await updateCommitment(db, actor, id, concepts, { kind: "deliverable", title: "Three concepts (revised)", price: "650000" });
+  it("creates commitments for commercial steps and derives payment triggers from the workflow trigger", async () => {
+    const { actor, workspaceId } = await payeeWithWorkspace("build");
+    const { id, launch, onLaunch } = await readyDraft(actor, workspaceId, "build-client@client.ng");
     const v = await getEngagementView(db, actor, id);
-    expect(v.items.find((c) => c.id === concepts)?.priceMinor).toBe(65_000_000n);
-    expect(v.summary.agreedMinor).toBe(155_000_000n);
+    expect(v.summary.agreedMinor).toBe(150_000_000n);
+    expect(v.summary.scheduledMinor).toBe(150_000_000n);
+    const deposit = v.items.find((c) => c.title === "Deposit")!;
+    const balance = v.items.find((c) => c.title === "Balance")!;
+    expect(deposit).toMatchObject({ trigger: "on_confirmation", termsDays: 7 });
+    expect(balance).toMatchObject({ trigger: "on_acceptance", linkedCommitmentId: launch });
+    expect(v.problems).toEqual([]);
+    expect(v.clauses.map((c) => c.text)).toEqual(["When the agreement is confirmed:", "When “Launch assets” is accepted:"]);
+    expect(v.clauses[1]!.lines).toEqual(["a) Kola Foods pays “Balance”: ₦900,000.00.", "b) Notify Ada Studio: “Balance is due”."].map((l) => l.replace("Ada Studio", "build Studio")));
+    // Changing a workflow's trigger re-derives its payments' trigger.
+    await updateWorkflowTrigger(db, actor, id, onLaunch, { triggerType: "date_reached", date: "2027-03-01" });
+    const after = await getEngagementView(db, actor, id);
+    expect(after.items.find((c) => c.title === "Balance")).toMatchObject({ trigger: "on_date", triggerDate: "2027-03-01", linkedCommitmentId: null });
   });
-});
 
-describe("step flow ordering (D-65)", () => {
-  it("moves steps up and down in the draft, ignores moves past the edge, and is locked once sent", async () => {
+  it("validates steps, conditions and references, and protects things other workflows depend on", async () => {
+    const { actor, workspaceId } = await payeeWithWorkspace("edit");
+    const { id, main, conceptsStep, launch, onLaunch } = await readyDraft(actor, workspaceId, "edit-client@client.ng");
+    expect((await code(addStep(db, actor, id, main, "start_deliverable", { title: "Bad", price: "12.345" }))).details).toMatchObject({ fields: { price: expect.any(String) } });
+    expect((await code(addWorkflow(db, actor, id, { triggerType: "" }))).code).toBe("VALIDATION");
+    expect((await code(setStepCondition(db, actor, id, conceptsStep, { conditionType: "delivered_before", conditionCommitmentId: launch }))).details).toMatchObject({ fields: { conditionDate: expect.any(String) } });
+    await setStepCondition(db, actor, id, conceptsStep, { conditionType: "outstanding_amount", conditionOp: "less", conditionAmount: "50,000" });
+    const v = await getEngagementView(db, actor, id);
+    expect(v.workflows[0]!.steps.find((x) => x.id === conceptsStep)!.onlyWhen).toEqual({ type: "outstanding_amount", op: "less", amountMinor: "5000000" });
+    // The Launch assets step is watched by another workflow: can't be removed.
+    const launchStep = v.workflows[0]!.steps.find((x) => x.commitment?.id === launch)!;
+    expect((await code(removeStep(db, actor, id, launchStep.id))).message).toMatch(/refers to this/);
+    // Edit a deliverable in place.
+    await updateStep(db, actor, id, conceptsStep, { title: "Three concepts (revised)", price: "650000" });
+    expect((await getEngagementView(db, actor, id)).summary.agreedMinor).toBe(155_000_000n);
+    // Remove the dependent workflow, then the step can go.
+    await removeWorkflow(db, actor, id, onLaunch);
+    await removeStep(db, actor, id, launchStep.id);
+    const end = await getEngagementView(db, actor, id);
+    expect(end.workflows).toHaveLength(1);
+    expect(end.items.map((c) => c.title)).not.toContain("Launch assets");
+  });
+
+  it("reorders steps and workflows while drafting; everything is locked once sent", async () => {
     const { actor, workspaceId } = await payeeWithWorkspace("order");
-    const { id, concepts } = await readyDraft(actor, workspaceId, "order-client@client.ng");
-    const titles = async () => (await getEngagementView(db, actor, id)).items.map((c) => c.title);
-    expect((await titles()).slice(0, 2)).toEqual(["Three concepts", "Launch assets"]);
-    await moveCommitment(db, actor, id, concepts, "down");
-    expect((await titles()).slice(0, 2)).toEqual(["Launch assets", "Three concepts"]);
-    await moveCommitment(db, actor, id, concepts, "up");
-    await moveCommitment(db, actor, id, concepts, "up"); // already first: no-op
+    const { id, main, conceptsStep, onLaunch } = await readyDraft(actor, workspaceId, "order-client@client.ng");
+    const titles = async () => (await getEngagementView(db, actor, id)).workflows[0]!.steps.map((x) => x.commitment?.title);
+    expect((await titles()).slice(0, 2)).toEqual(["Deposit", "Three concepts"]);
+    await moveStep(db, actor, id, conceptsStep, "up");
+    expect((await titles()).slice(0, 2)).toEqual(["Three concepts", "Deposit"]);
+    await moveStep(db, actor, id, conceptsStep, "up"); // edge: no-op
     expect((await titles())[0]).toBe("Three concepts");
+    // "+" after the trigger and after a specific step insert at that point.
+    await addStep(db, actor, id, main, "notify", { who: "payer", message: "first", insertAfter: "trigger" });
+    await addStep(db, actor, id, main, "notify", { who: "payer", message: "second", insertAfter: conceptsStep });
+    const steps = (await getEngagementView(db, actor, id)).workflows[0]!.steps;
+    expect(steps[0]!.params.message).toBe("first");
+    expect(steps[steps.findIndex((x) => x.id === conceptsStep) + 1]!.params.message).toBe("second");
+    await moveWorkflow(db, actor, id, onLaunch, "up");
+    expect((await getEngagementView(db, actor, id)).workflows[0]!.id).toBe(onLaunch);
+    await moveWorkflow(db, actor, id, onLaunch, "down");
     await submitForConfirmation(db, actor, id);
-    expect((await code(moveCommitment(db, actor, id, concepts, "down"))).code).toBe("CONFLICT");
+    expect((await code(addStep(db, actor, id, main, "notify", { who: "both" }))).code).toBe("CONFLICT");
+    expect((await code(moveStep(db, actor, id, conceptsStep, "down"))).code).toBe("CONFLICT");
+    expect((await code(addWorkflow(db, actor, id, { triggerType: "change_confirmed" }))).code).toBe("CONFLICT");
   });
 });
 
@@ -164,7 +206,7 @@ describe("submission, counterparty access and confirmation (FR-BAS, FR-ID-05, AC
     expect(seq).toBe(1);
     expect((await getEngagementView(db, payee, id)).status).toBe("awaiting_confirmation");
     // Direct edits are refused once sent (AC-BAS-2).
-    expect((await code(addCommitment(db, payee, id, { kind: "deliverable", title: "Sneaky", price: "1" }))).code).toBe("CONFLICT");
+    expect((await code(addStep(db, payee, id, (await getEngagementView(db, payee, id)).workflows[0]!.id, "start_deliverable", { title: "Sneaky", price: "1" }))).code).toBe("CONFLICT");
 
     const invite = await lastEmailTo(clientEmail);
     expect(invite.subject).toContain("asked you to confirm");
@@ -198,10 +240,11 @@ describe("submission, counterparty access and confirmation (FR-BAS, FR-ID-05, AC
     expect((await getEngagementView(db, payee, id)).status).toBe("draft");
     const clientViewOfDraft = await getEngagementView(db, client, id);
     expect(clientViewOfDraft.items.map((c) => c.title)).toContain("Three concepts");
+    expect(clientViewOfDraft.clauses.length).toBeGreaterThan(0); // reads the snapshot the client was sent
     expect(clientViewOfDraft.can.respond).toBe(false);
 
     // Payee edits and resubmits; the old link stops working.
-    await addCommitment(db, payee, id, { kind: "deliverable", title: "Social cut-downs", price: "100000" });
+    await addStep(db, payee, id, (await getEngagementView(db, payee, id)).workflows[0]!.id, "start_deliverable", { title: "Social cut-downs", price: "100000" });
     const { seq: seq2 } = await submitForConfirmation(db, payee, id);
     expect(seq2).toBe(2);
     expect((await previewEngagementInvitation(db, token)).status).toBe("revoked");
@@ -224,7 +267,12 @@ describe("submission, counterparty access and confirmation (FR-BAS, FR-ID-05, AC
     const revs = await db.select().from(commitmentRevisions);
     expect(revs.some((r) => r.versionFrom === 0 && active.items.some((c) => c.id === r.commitmentId))).toBe(false);
     expect((await code(respondToBaseline(db, client, id, { response: "confirm", submissionId: v2.latestSubmission!.id, acknowledged: "yes" }))).code).toBe("FORBIDDEN");
-    expect((await code(addCommitment(db, payee, id, { kind: "deliverable", title: "After", price: "1" }))).code).toBe("CONFLICT");
+    expect((await code(addStep(db, payee, id, active.workflows[0]!.id, "start_deliverable", { title: "After", price: "1" }))).code).toBe("CONFLICT");
+    // Workflows and steps are version 1 of the agreement now.
+    expect((await db.select().from(workflows).where(eq(workflows.engagementId, id))).every((w) => w.versionFrom === 1)).toBe(true);
+    expect((await db.select().from(workflowSteps)).filter((x) => active.workflows.some((w) => w.id === x.workflowId)).every((x) => x.versionFrom === 1)).toBe(true);
+    const snap = v2.latestSubmission!.snapshot as { clauses: Array<{ text: string }> };
+    expect(snap.clauses.map((c) => c.text)).toEqual(active.clauses.map((c) => c.text)); // what was confirmed = what is shown
     expect(await verifyEngagementChain(db, id)).toBeNull();
     expect(active.events.map((e) => e.type)).toEqual(
       expect.arrayContaining(["baseline.submitted", "invitation.accepted", "baseline.changes_requested", "baseline.resubmitted", "baseline.confirmed"]),

@@ -163,6 +163,7 @@ If either answer is negative, the fallback (D-29) keeps the product useful.
 | D-60 | **Strictly monochrome identity** (black, white, neutral greys), with light, dark and system themes. Spec: `RETENUM_DESIGN_SYSTEM.md` | DECIDED (founder requirement) |
 | D-61 | **Delivered as a Progressive Web App**, mobile-first and excellent on desktop. Spec: `RETENUM_UI_UX_SPECIFICATION.md` | DECIDED (founder requirement) |
 | D-62 | **No offline queueing of commercial actions.** Offline is read-only for already-open pages, and nothing is confirmed, recorded or paid without the server | DECIDED |
+| D-66 | **The whole engagement works like Bubble workflows** (supersedes D-65): workflow editor as the main view, three panes, v1 trigger and step vocabulary, no templates (build from blank with +), initiator builds the draft, helpers (Notify, Remind) in v1, "Read as agreement" clauses, run history. Plan: `RETENUM_ENGAGEMENT_WORKFLOW_PLAN.md` §10 | DECIDED (founder, 19 Nov 2026) |
 | D-65 | **The agreement is shown and built as a step flow** (founder request, modelled on Bubble workflows): numbered steps (Agreement confirmed → deliverables, what a party provides, dated or requested payments); dependent payments sit under the step that triggers them, each step has its own "+", and "+ Add step" opens a step-type menu. **Commercial steps are part of the agreement both parties confirm; after confirmation they change only through a confirmed change (Slice 3).** Private helper automations (reminders) and "only when" conditions are planned, not built | DECIDED (founder choice, 19 Nov 2026) |
 | D-64 | **Guided onboarding, no empty states as destinations:** a workspace must be created before using the app; "New engagement" is always visible on Overview and Engagements; creation never leaves an empty engagement (FR-ONB-01…03, FR-ENG-11/12) | DECIDED (founder requirement) |
 | D-63 | **A design-system slice (1A) comes before further screens**, and the design quality gate is part of every UI slice | DECIDED |
@@ -195,6 +196,7 @@ If either answer is negative, the fallback (D-29) keeps the product useful.
 
 | Date | Change | Reason |
 |---|---|---|
+| 2026-11-19 | Added D-66 (engagement as Bubble-style workflows), superseding D-65 | Founder request and alignment |
 | 2026-11-19 | Added D-65 (agreement as a step flow, founder choice) | Founder request |
 | 2026-11-19 | Added D-64 (onboarding and always-available New engagement) | Founder requirement |
 | 2026-11-18 | Added D-60…D-63 (monochrome identity, PWA, no offline queueing, design slice first) | Founder design and PWA requirements |

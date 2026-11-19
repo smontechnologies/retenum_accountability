@@ -11,18 +11,27 @@ import { errorToFormState, type FormState } from "@/server/lib/form-state";
 import { kickOutbox } from "@/server/outbox/kick";
 import {
   acceptEngagementInvitation,
-  addCommitment,
   createDraft,
-  moveCommitment,
   previewEngagementInvitation,
-  removeCommitment,
   resendInvitation,
   respondToBaseline,
   submitForConfirmation,
-  updateCommitment,
   updateResponseWindows,
   withdrawEngagement,
 } from "@/server/modules/engagements/service";
+import {
+  addStep,
+  addWorkflow,
+  moveStep,
+  moveWorkflow,
+  removeStep,
+  removeWorkflow,
+  setStepCondition,
+  setWorkflowCondition,
+  updateStep,
+  updateWorkflowTrigger,
+} from "@/server/modules/engagements/workflows";
+import type { ActionType } from "@/domain/workflow";
 import { getCurrentWorkspace } from "@/server/modules/workspaces/current";
 
 const str = (d: FormData, k: string) => String(d.get(k) ?? "");
@@ -51,46 +60,89 @@ export async function createDraftAction(_: FormState, data: FormData): Promise<F
   } catch (err) {
     return toState(err);
   }
-  redirect(`/app/engagements/${id}/agreement?created=1`);
+  redirect(`/app/engagements/${id}?created=1`);
 }
 
-export async function saveCommitmentAction(_: FormState, data: FormData): Promise<FormState> {
+// ----- Workflow editor (D-66) ---------------------------------------------------------------------
+
+async function run(data: FormData, fn: (actor: Awaited<ReturnType<typeof requireActor>>, engagementId: string) => Promise<unknown>, message: string): Promise<FormState> {
   const actor = await requireActor();
   const engagementId = str(data, "engagementId");
-  const commitmentId = str(data, "commitmentId");
-  const input = { ...fields(data), kind: str(data, "kind") } as never;
   try {
-    if (commitmentId) await updateCommitment(getDb(), actor, engagementId, commitmentId, input);
-    else await addCommitment(getDb(), actor, engagementId, input);
+    await fn(actor, engagementId);
   } catch (err) {
     return toState(err);
   }
   refresh(engagementId);
-  return { status: "success", message: commitmentId ? "Item updated." : "Item added." };
+  return { status: "success", message };
 }
 
-export async function removeCommitmentAction(_: FormState, data: FormData): Promise<FormState> {
+export async function addWorkflowAction(_: FormState, data: FormData): Promise<FormState> {
   const actor = await requireActor();
   const engagementId = str(data, "engagementId");
+  let id: string;
   try {
-    await removeCommitment(getDb(), actor, engagementId, str(data, "commitmentId"));
+    ({ id } = await addWorkflow(getDb(), actor, engagementId, fields(data)));
   } catch (err) {
     return toState(err);
   }
   refresh(engagementId);
-  return { status: "success", message: "Item removed." };
+  redirect(`/app/engagements/${engagementId}?w=${id}&s=trigger`);
 }
 
-export async function moveStepAction(_: FormState, data: FormData): Promise<FormState> {
+export async function updateTriggerAction(_: FormState, data: FormData): Promise<FormState> {
+  return run(data, (a, e) => updateWorkflowTrigger(getDb(), a, e, str(data, "workflowId"), fields(data)), "Trigger saved.");
+}
+
+export async function removeWorkflowAction(_: FormState, data: FormData): Promise<FormState> {
   const actor = await requireActor();
   const engagementId = str(data, "engagementId");
   try {
-    await moveCommitment(getDb(), actor, engagementId, str(data, "commitmentId"), str(data, "direction") === "up" ? "up" : "down");
+    await removeWorkflow(getDb(), actor, engagementId, str(data, "workflowId"));
   } catch (err) {
     return toState(err);
   }
   refresh(engagementId);
-  return { status: "success" };
+  redirect(`/app/engagements/${engagementId}`);
+}
+
+export async function addStepAction(_: FormState, data: FormData): Promise<FormState> {
+  return run(data, (a, e) => addStep(getDb(), a, e, str(data, "workflowId"), str(data, "actionType") as ActionType, fields(data)), "Step added.");
+}
+
+export async function updateStepAction(_: FormState, data: FormData): Promise<FormState> {
+  return run(data, (a, e) => updateStep(getDb(), a, e, str(data, "stepId"), fields(data)), "Step saved.");
+}
+
+export async function removeStepAction(_: FormState, data: FormData): Promise<FormState> {
+  const actor = await requireActor();
+  const engagementId = str(data, "engagementId");
+  try {
+    await removeStep(getDb(), actor, engagementId, str(data, "stepId"));
+  } catch (err) {
+    return toState(err);
+  }
+  refresh(engagementId);
+  redirect(`/app/engagements/${engagementId}?w=${str(data, "workflowId")}`);
+}
+
+export async function setConditionAction(_: FormState, data: FormData): Promise<FormState> {
+  const target = str(data, "target");
+  return run(
+    data,
+    (a, e) => (target === "workflow" ? setWorkflowCondition(getDb(), a, e, str(data, "workflowId"), fields(data)) : setStepCondition(getDb(), a, e, str(data, "stepId"), fields(data))),
+    "Condition saved.",
+  );
+}
+
+/** Plain form actions (no form state) for the reorder arrows. */
+export async function moveAction(data: FormData): Promise<void> {
+  const actor = await requireActor();
+  const engagementId = str(data, "engagementId");
+  const direction = str(data, "direction") === "up" ? "up" : "down";
+  if (str(data, "stepId")) await moveStep(getDb(), actor, engagementId, str(data, "stepId"), direction);
+  else await moveWorkflow(getDb(), actor, engagementId, str(data, "workflowId"), direction);
+  refresh(engagementId);
 }
 
 export async function saveResponseWindowsAction(_: FormState, data: FormData): Promise<FormState> {
@@ -115,7 +167,7 @@ export async function submitAction(_: FormState, data: FormData): Promise<FormSt
   }
   kickOutbox();
   refresh(engagementId);
-  redirect(`/app/engagements/${engagementId}?sent=1`);
+  redirect(`/app/engagements/${engagementId}/agreement?sent=1`);
 }
 
 export async function resendAction(_: FormState, data: FormData): Promise<FormState> {
@@ -154,7 +206,7 @@ export async function respondAction(_: FormState, data: FormData): Promise<FormS
   }
   kickOutbox();
   refresh(engagementId);
-  redirect(`/app/engagements/${engagementId}?responded=${encodeURIComponent(response)}`);
+  redirect(`/app/engagements/${engagementId}/agreement?responded=${encodeURIComponent(response)}`);
 }
 
 // ----- Counterparty access: invitation link + email code (FR-ID-05, D-43) ---------------------------

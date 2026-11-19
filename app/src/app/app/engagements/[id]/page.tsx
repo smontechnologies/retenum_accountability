@@ -2,108 +2,125 @@ import Link from "next/link";
 import { getDb } from "@/server/db/client";
 import { requireActor } from "@/server/auth/session";
 import { getEngagementView } from "@/server/modules/engagements/service";
-import { describeEvent, formatDate } from "@/components/engagement/format";
+import { ACTIONS, conditionSentence, stepSentence, triggerSentence, type WorkflowView } from "@/domain/workflow";
+import type { CommitmentView } from "@/domain/baseline";
+import { Canvas } from "@/components/workflow/canvas";
+import { PropertyEditor, PropertyPane } from "@/components/workflow/editor-panel";
+import { WorkflowList } from "@/components/workflow/list";
+import { AddStepButton } from "@/components/workflow/pickers";
+import type { EditableStep, EditorOptions } from "@/components/workflow/types";
 import { Alert } from "@/components/ui/alert";
 import { ButtonLink } from "@/components/ui/button";
-import { ConfirmAction } from "@/components/ui/dialog";
-import { DescriptionList } from "@/components/ui/description-list";
-import { MoneyFigure } from "@/components/ui/money";
-import { Panel } from "@/components/ui/panel";
-import { Timeline } from "@/components/ui/timeline";
-import { resendAction, withdrawAction } from "../actions";
 
-export const metadata = { title: "Engagement" };
+export const metadata = { title: "Workflows" };
 
-/** Engagement overview (UI/UX S6): what needs attention, the position, the latest activity. */
-export default async function EngagementOverview(props: { params: Promise<{ id: string }>; searchParams: Promise<{ sent?: string; responded?: string }> }) {
+const decimal = (minor: bigint | null) => (minor === null ? null : `${minor / 100n}.${(minor % 100n).toString().padStart(2, "0")}`);
+
+/**
+ * The engagement as a Bubble-style workflow editor (D-66, FR-WF-01/02): workflow list · vertical
+ * canvas · property editor (bottom sheet on phones). Read-only for the counterparty and once sent.
+ */
+export default async function WorkflowEditorPage(props: { params: Promise<{ id: string }>; searchParams: Promise<{ w?: string; s?: string; created?: string; sent?: string; responded?: string }> }) {
   const { id } = await props.params;
-  const { sent, responded } = await props.searchParams;
+  const sp = await props.searchParams;
   const actor = await requireActor(`/app/engagements/${id}`);
   const v = await getEngagementView(getDb(), actor, id);
-  const last = v.latestSubmission;
-  const sideName = (s: string | null) => v.parties.find((p) => p.side === s)?.orgName;
+  const base = `/app/engagements/${id}`;
+  const editable = v.can.editDraft;
+  const wf: WorkflowView | undefined = v.workflows.find((w) => w.id === sp.w) ?? v.workflows[0];
+  const items = v.items;
+  const opt = (kind: CommitmentView["kind"]) => items.filter((c) => c.kind === kind).map((c) => ({ id: c.id, label: c.title }));
+  const options: EditorOptions = {
+    engagementId: id,
+    payerName: v.parties.find((p) => p.side === "payer")!.orgName,
+    payeeName: v.parties.find((p) => p.side === "payee")!.orgName,
+    deliverables: opt("deliverable"),
+    obligations: opt("party_obligation"),
+    payments: opt("payment_obligation"),
+    workflows: v.workflows.map((w) => ({ id: w.id, label: triggerSentence(w, v.words) })),
+  };
 
-  let attention: React.ReactNode = null;
-  if (v.status === "draft" && v.viewer.isInitiatorSide) {
-    attention = (
-      <Panel title={last?.status === "changes_requested" ? "Changes requested" : "Finish setting up"}>
-        <p className="text-small text-fg-secondary">
-          {last?.status === "changes_requested"
-            ? `${v.other.orgName} asked for changes: "${last.comment}". Update the agreement and send it again.`
-            : v.problems.length > 0
-              ? v.problems.join(" ")
-              : `Ready to send to ${v.other.orgName} for confirmation.`}
-        </p>
-        <div className="mt-4"><ButtonLink href={`/app/engagements/${id}/agreement`}>Open the agreement</ButtonLink></div>
-      </Panel>
+  // Selection for the property editor.
+  const wIndex = wf ? v.workflows.indexOf(wf) : -1;
+  let selection: Parameters<typeof PropertyEditor>[0]["selection"] = null;
+  let readOnly: React.ReactNode = null;
+  let sheetTitle = "Details";
+  if (wf && sp.s === "trigger") {
+    selection = { kind: "trigger", trigger: { workflowId: wf.id, triggerType: wf.triggerType, triggerParams: wf.triggerParams, onlyWhen: wf.onlyWhen }, isFirst: wIndex === 0, isLast: wIndex === v.workflows.length - 1 };
+    sheetTitle = "Trigger";
+    readOnly = (
+      <>
+        <h2 className="text-h3 font-semibold">Trigger</h2>
+        <p>{triggerSentence(wf, v.words)}</p>
+        {wf.onlyWhen && <p className="text-small text-fg-secondary">Only when {conditionSentence(wf.onlyWhen, v.words)}</p>}
+      </>
     );
-  } else if (v.status === "awaiting_confirmation" && v.can.respond && last) {
-    attention = (
-      <Panel title="Your response is needed" className="border-2 border-fg">
-        <p className="text-small text-fg-secondary">{v.other.orgName} asked you to confirm this agreement by {formatDate(last.respondBy)}.</p>
-        <div className="mt-4"><ButtonLink href={`/app/engagements/${id}/agreement`}>Review and respond</ButtonLink></div>
-      </Panel>
-    );
-  } else if (v.status === "awaiting_confirmation" && v.viewer.isInitiatorSide && last) {
-    attention = (
-      <Panel title={`Waiting for ${v.other.orgName}`}>
-        <DescriptionList
-          items={[
-            { label: "Sent to", value: `${v.other.repName ?? ""} (${v.other.repEmail})` },
-            { label: "Sent", value: formatDate(last.submittedAt) },
-            { label: "Response due by", value: formatDate(last.respondBy) },
-            { label: "Opened", value: v.invitation?.firstAcceptedAt ? formatDate(v.invitation.firstAcceptedAt) : "Not yet" },
-          ]}
-        />
-        {(v.can.resendInvitation || v.can.withdraw) && (
-          <div className="mt-4 flex flex-wrap gap-2">
-            {v.can.resendInvitation && (
-              <ConfirmAction trigger="Send a new link" title="Send a new link?" consequence={`${v.other.repEmail} gets a new email. Earlier links stop working.`} confirmLabel="Send new link" action={resendAction} hidden={{ engagementId: id }} successToast="New link sent." />
-            )}
-            {v.can.withdraw && (
-              <ConfirmAction trigger="Withdraw" triggerVariant="destructive" title="Withdraw this engagement?" consequence="The other party can no longer confirm it. This is recorded and can't be undone." confirmLabel="Withdraw engagement" action={withdrawAction} hidden={{ engagementId: id }} successToast="Engagement withdrawn." />
-            )}
-          </div>
-        )}
-      </Panel>
-    );
+  } else if (wf && sp.s) {
+    const i = wf.steps.findIndex((x) => x.id === sp.s);
+    const st = wf.steps[i];
+    if (st) {
+      const c = st.commitment;
+      const step: EditableStep = {
+        id: st.id,
+        workflowId: wf.id,
+        actionType: st.actionType,
+        params: st.params,
+        onlyWhen: st.onlyWhen,
+        commitment: c
+          ? { title: c.title, price: decimal(c.priceMinor), definitionOfDone: c.definitionOfDone, quantity: c.quantity, unit: c.unit, dueDate: c.dueDate, exclusions: c.exclusions, description: c.description, termsDays: c.termsDays || null, owedBySide: c.owedBySide }
+          : null,
+      };
+      selection = { kind: "step", step, number: i + 1, isFirst: i === 0, isLast: i === wf.steps.length - 1 };
+      sheetTitle = `Step ${i + 1}: ${ACTIONS[st.actionType].label}`;
+      readOnly = (
+        <>
+          <p className="text-caption text-fg-muted">Step {i + 1} · {ACTIONS[st.actionType].label}</p>
+          <p className="font-medium">{stepSentence(st, v.words)}</p>
+          {c?.definitionOfDone && <p className="text-small text-fg-secondary">Done when: {c.definitionOfDone}</p>}
+          {c?.exclusions && <p className="text-small text-fg-secondary">Not included: {c.exclusions}</p>}
+          {st.onlyWhen && <p className="text-small text-fg-secondary">Only when {conditionSentence(st.onlyWhen, v.words)}</p>}
+        </>
+      );
+    }
   }
+  const panel = <PropertyEditor options={options} selection={selection} editable={editable} readOnly={readOnly} />;
 
   return (
-    <div className="space-y-6">
-      {sent && v.status === "awaiting_confirmation" && <Alert tone="success" title="Sent for confirmation">{v.other.orgName} has been emailed a link. You'll be notified when they respond.</Alert>}
-      {responded === "confirm" && v.status === "active" && <Alert tone="success" title="Agreement confirmed">This is now version 1 of the shared record.</Alert>}
-      {responded === "request_changes" && v.status === "draft" && <Alert tone="success" title="Request sent">{v.other.orgName} will revise the agreement and send it again.</Alert>}
-      {responded === "decline" && v.status === "withdrawn" && <Alert tone="success" title="Declined">The engagement has been withdrawn.</Alert>}
-      {v.status === "withdrawn" && <Alert tone="info" title="Withdrawn">This engagement was withdrawn before it was confirmed. Its history is kept.</Alert>}
-      <div className="grid items-start gap-6 xl:grid-cols-[2fr_1fr]">
-        <div className="space-y-6">
-          {attention}
-          <Panel title="Summary">
-            <DescriptionList
-              items={[
-                { label: "Paying", value: sideName("payer") },
-                { label: "Being paid", value: sideName("payee") },
-                { label: "Deliverables", value: `${v.summary.deliverables}` },
-                { label: "Payments scheduled", value: <>{v.summary.paymentObligations} totalling <MoneyFigure amountMinor={v.summary.scheduledMinor} /></> },
-                { label: "Confirmed", value: v.engagement.confirmedAt ? formatDate(v.engagement.confirmedAt) : "Not yet" },
-              ]}
-            />
-            <p className="mt-4 text-small"><Link href={`/app/engagements/${id}/agreement`} className="font-medium underline underline-offset-4">See the full agreement</Link></p>
-          </Panel>
+    <div className="space-y-5">
+      {sp.created && <Alert tone="success" title="Draft created">Build the agreement with workflows: use + to add what happens, then read it as an agreement and send it to {v.other.orgName}. Nothing is shared until you send it.</Alert>}
+      {v.status === "draft" && v.viewer.isInitiatorSide && !sp.created && v.problems.length > 0 && (
+        <Alert tone="info" title="Before you can send this">
+          <ul className="mt-1 list-disc space-y-0.5 pl-5">{v.problems.slice(0, 4).map((p) => <li key={p}>{p}</li>)}</ul>
+        </Alert>
+      )}
+      {v.status === "draft" && v.viewer.isInitiatorSide && v.problems.length === 0 && (
+        <Alert tone="success" title="Ready to send">
+          Read it as an agreement and send it to {v.other.orgName}. <Link href={`${base}/agreement`} className="font-medium underline underline-offset-4">Read as agreement</Link>
+        </Alert>
+      )}
+      {v.can.respond && (
+        <Alert tone="warning" title="Your response is needed">
+          Read the agreement and confirm it, ask for changes or decline. <Link href={`${base}/agreement`} className="font-medium underline underline-offset-4">Review and respond</Link>
+        </Alert>
+      )}
+      {!editable && v.status === "awaiting_confirmation" && v.viewer.isInitiatorSide && <Alert tone="info">Sent to {v.other.orgName}. The workflows are locked while they review them.</Alert>}
+
+      <div className="gap-6 lg:grid lg:grid-cols-[15rem_minmax(0,1fr)] xl:grid-cols-[15rem_minmax(0,1fr)_21rem]">
+        <aside aria-label="Workflow list" className="mb-6 rounded-panel border border-line bg-surface p-2 lg:mb-0 lg:self-start">
+          <WorkflowList workflows={v.workflows} words={v.words} selected={wf?.id} base={base} options={options} editable={editable} />
+        </aside>
+        <div className="min-w-0">
+          {wf ? (
+            <>
+              <Canvas workflow={wf} words={v.words} base={base} selected={sp.s} options={options} editable={editable} />
+              {editable && wf.steps.length > 0 && <div className="mt-4"><AddStepButton options={options} workflowId={wf.id} variant="block" label="Add a step at the end" /></div>}
+            </>
+          ) : (
+            <p className="text-small text-fg-secondary">No workflows.</p>
+          )}
+          {v.status === "draft" && v.viewer.isInitiatorSide && <div className="mt-6"><ButtonLink href={`${base}/agreement`} variant="secondary">Read as agreement</ButtonLink></div>}
         </div>
-        <Panel title="Recent activity">
-          <Timeline
-            events={v.events.slice(0, 6).map((e) => ({
-              id: e.id,
-              at: e.createdAt,
-              actor: e.actorName || (e.actorSide === "system" ? "Retenum" : "Someone"),
-              side: (e.actorSide ?? undefined) as "payer" | "payee" | "system" | undefined,
-              text: describeEvent(e.type, e.data),
-            }))}
-          />
-          <p className="mt-4 text-small"><Link href={`/app/engagements/${id}/activity`} className="font-medium underline underline-offset-4">All activity</Link></p>
-        </Panel>
+        <PropertyPane open={Boolean(selection)} title={sheetTitle} closeHref={`${base}?w=${wf?.id ?? ""}`}>{panel}</PropertyPane>
       </div>
     </div>
   );

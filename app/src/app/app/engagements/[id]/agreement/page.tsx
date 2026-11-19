@@ -2,7 +2,6 @@ import { getDb } from "@/server/db/client";
 import { requireActor } from "@/server/auth/session";
 import { getEngagementView } from "@/server/modules/engagements/service";
 import { submissionWarnings } from "@/domain/baseline";
-import { StepFlow } from "@/components/engagement/step-flow";
 import { formatDate } from "@/components/engagement/format";
 import { ResponsePanel } from "@/components/engagement/response-panel";
 import { Alert } from "@/components/ui/alert";
@@ -12,13 +11,13 @@ import { DescriptionList } from "@/components/ui/description-list";
 import { ActionForm, Field } from "@/components/ui/form";
 import { MoneyFigure } from "@/components/ui/money";
 import { Panel } from "@/components/ui/panel";
-import { saveResponseWindowsAction, submitAction } from "../../actions";
+import { resendAction, saveResponseWindowsAction, submitAction, withdrawAction } from "../../actions";
 
-export const metadata = { title: "Agreement" };
+export const metadata = { title: "Read as agreement" };
 
-export default async function AgreementPage(props: { params: Promise<{ id: string }>; searchParams: Promise<{ created?: string }> }) {
+export default async function AgreementPage(props: { params: Promise<{ id: string }>; searchParams: Promise<{ responded?: string; sent?: string }> }) {
   const { id } = await props.params;
-  const { created } = await props.searchParams;
+  const { responded, sent } = await props.searchParams;
   const actor = await requireActor(`/app/engagements/${id}/agreement`);
   const v = await getEngagementView(getDb(), actor, id);
   const payer = v.parties.find((p) => p.side === "payer")!;
@@ -30,11 +29,10 @@ export default async function AgreementPage(props: { params: Promise<{ id: strin
 
   return (
     <div className="space-y-6">
-      {created && (
-        <Alert tone="success" title="Draft created">
-          Add what will be delivered and the payment schedule, then send it to {v.other.orgName} to confirm. Nothing is shared with them until you send it.
-        </Alert>
-      )}
+      {sent && v.status === "awaiting_confirmation" && <Alert tone="success" title="Sent for confirmation">{v.other.orgName} has been emailed a link. You'll be notified when they respond.</Alert>}
+      {responded === "confirm" && v.status === "active" && <Alert tone="success" title="Agreement confirmed">This is now version 1 of the shared record.</Alert>}
+      {responded === "request_changes" && v.status === "draft" && <Alert tone="success" title="Request sent">{v.other.orgName} will revise the agreement and send it again.</Alert>}
+      {responded === "decline" && v.status === "withdrawn" && <Alert tone="success" title="Declined">The engagement has been withdrawn.</Alert>}
       {v.status === "draft" && v.viewer.isInitiatorSide && last?.status === "changes_requested" && (
         <Alert tone="warning" title={`${v.other.orgName} asked for changes`}>{last.comment}</Alert>
       )}
@@ -45,7 +43,42 @@ export default async function AgreementPage(props: { params: Promise<{ id: strin
 
       {v.can.respond && last && <ResponsePanel engagementId={id} submissionId={last.id} orgName={v.me.orgName} respondBy={formatDate(last.respondBy)} />}
 
-      <StepFlow engagementId={id} items={v.items} editable={editable} payerName={payer.orgName} payeeName={payee.orgName} />
+      {v.status === "awaiting_confirmation" && v.viewer.isInitiatorSide && last && (
+        <Panel title={`Waiting for ${v.other.orgName}`}>
+          <DescriptionList
+            items={[
+              { label: "Sent to", value: `${v.other.repName ?? ""} (${v.other.repEmail})` },
+              { label: "Sent", value: formatDate(last.submittedAt) },
+              { label: "Response due by", value: formatDate(last.respondBy) },
+              { label: "Opened", value: v.invitation?.firstAcceptedAt ? formatDate(v.invitation.firstAcceptedAt) : "Not yet" },
+            ]}
+          />
+          <div className="mt-4 flex flex-wrap gap-2">
+            {v.can.resendInvitation && <ConfirmAction trigger="Send a new link" title="Send a new link?" consequence={`${v.other.repEmail} gets a new email. Earlier links stop working.`} confirmLabel="Send new link" action={resendAction} hidden={{ engagementId: id }} successToast="New link sent." />}
+            {v.can.withdraw && <ConfirmAction trigger="Withdraw" triggerVariant="destructive" title="Withdraw this engagement?" consequence="The other party can no longer confirm it. This is recorded and can't be undone." confirmLabel="Withdraw engagement" action={withdrawAction} hidden={{ engagementId: id }} successToast="Engagement withdrawn." />}
+          </div>
+        </Panel>
+      )}
+
+      <section aria-labelledby="clauses-heading" className="rounded-panel border border-line bg-raised p-4 lg:p-6">
+        <h2 id="clauses-heading" className="text-h3 font-semibold">Agreement between {payee.orgName} and {payer.orgName}</h2>
+        <p className="mt-1 text-small text-fg-secondary">Generated from the workflows{v.viewer.isInitiatorSide && editable ? ". Edit the workflows to change it" : ""}. This is exactly what is confirmed.</p>
+        {v.clauses.length === 0 ? (
+          <p className="mt-4 text-small text-fg-secondary">Nothing yet. Add steps to the workflows.</p>
+        ) : (
+          <ol className="mt-5 space-y-5">
+            {v.clauses.map((c) => (
+              <li key={c.number} className="grid grid-cols-[2rem_minmax(0,1fr)] gap-x-2">
+                <span className="font-semibold tabular">{c.number}.</span>
+                <div className="min-w-0">
+                  <p className="font-semibold break-words">{c.text}</p>
+                  <ul className="mt-1.5 space-y-1">{c.lines.map((l) => <li key={l} className="text-body break-words">{l}</li>)}</ul>
+                </div>
+              </li>
+            ))}
+          </ol>
+        )}
+      </section>
 
       <div className="grid items-start gap-6 xl:grid-cols-2">
         <Panel title="Totals">

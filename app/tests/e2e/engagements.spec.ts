@@ -18,25 +18,32 @@ async function shot(page: Page, name: string, project: string) {
   if (process.env.SHOTS === "1") await page.screenshot({ path: `../.data/shots/${name}-${project}.png`, fullPage: true });
 }
 
-/** "+ Add step" → choose a step type → fill the drawer. */
-async function addStep(page: Page, type: string, fill: (d: ReturnType<Page["getByRole"]>) => Promise<void>) {
-  await page.getByRole("button", { name: "Add step" }).click();
+type Scope = ReturnType<Page["getByRole"]>;
+
+/** Click a "+" (by its accessible name), pick a step type from the categorised menu, fill its form. */
+async function addStep(page: Page, plus: string, type: string, fill: (d: Scope) => Promise<void>) {
+  await page.getByRole("button", { name: plus }).click();
   await page.getByRole("dialog").getByRole("button", { name: new RegExp(`^${type}`) }).click();
-  const drawer = page.getByRole("dialog");
-  await fill(drawer);
-  await drawer.getByRole("button", { name: "Add to agreement" }).click();
+  const form = page.getByRole("dialog");
+  await expect(form.getByRole("heading", { name: type })).toBeVisible();
+  await fill(form);
+  await form.getByRole("button", { name: "Add step" }).click();
   await expect(page.getByRole("dialog")).toBeHidden();
 }
 
-async function addItem(page: Page, button: RegExp, fill: (d: ReturnType<Page["getByRole"]>) => Promise<void>, submit = "Add to agreement") {
-  await page.getByRole("button", { name: button }).first().click();
-  const drawer = page.getByRole("dialog");
-  await fill(drawer);
-  await drawer.getByRole("button", { name: submit }).click();
-  await expect(page.getByRole("dialog")).toBeHidden();
+/** The property editor: right pane on wide screens, bottom sheet on phones. */
+const properties = (page: Page) => page.getByRole("complementary", { name: "Property editor" }).or(page.getByRole("dialog"));
+
+async function closeSheetIfOpen(page: Page) {
+  if (await page.getByRole("dialog").isVisible()) {
+    await page.getByRole("dialog").getByRole("button", { name: "Close" }).click();
+    await expect(page.getByRole("dialog")).toBeHidden();
+  }
 }
 
-test("UJ-2: create an engagement, send it, the client signs in with a code, asks for changes, then confirms → Active v1", async ({ page, browser }, info) => {
+const section = (page: Page, name: string) => page.getByRole("navigation", { name: "Engagement sections" }).getByRole("link", { name });
+
+test("UJ-2 (D-66): build the agreement as workflows, read it as clauses, send; the client asks for changes, then confirms → Active v1", async ({ page, browser }, info) => {
   const p = info.project.name;
   const clientEmail = `ngozi-${p}@kolafoods.ng`;
 
@@ -51,50 +58,73 @@ test("UJ-2: create an engagement, send it, the client signs in with a code, asks
   await page.getByRole("button", { name: "Continue to the agreement" }).click();
   await expect(page.getByText("Draft created")).toBeVisible();
 
-  // Not ready to send yet: the reasons are listed (no empty engagements).
-  await expect(page.getByText("Add at least one deliverable: what will be delivered.")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Send for confirmation" })).toBeDisabled();
+  // No templates: one workflow, its trigger, and an empty "+".
+  const canvas = page.getByRole("region", { name: "Workflow canvas" });
+  await expect(canvas).toContainText("When the agreement is confirmed");
+  await expect(canvas).toContainText("No steps yet");
 
-  // Bubble-style step flow (D-65): "+ Add step" picks the step type...
-  await addStep(page, "Deliverable", async (d) => {
+  // "+" after the trigger → categorised step menu → step form.
+  await addStep(page, "Add a step after the trigger", "Make a payment due", async (d) => {
+    await d.getByLabel("Payment name").fill("Deposit");
+    await d.getByLabel("Amount (₦)").fill("600000");
+  });
+  await addStep(page, "Add a step at the end", "Start a deliverable", async (d) => {
     await d.getByLabel("What will be delivered").fill("Three concepts");
     await d.getByLabel("Price (₦)").fill("600000");
     await d.getByLabel("Definition of done").fill("Three concepts delivered as PDF");
   });
-  await addStep(page, "Deliverable", async (d) => {
+  await addStep(page, "Add a step at the end", "Start a deliverable", async (d) => {
     await d.getByLabel("What will be delivered").fill("Launch assets");
     await d.getByLabel("Price (₦)").fill("900,000");
   });
-  // ...and the "+" under a step adds what happens because of it.
-  await addItem(page, /Payment when confirmed/, async (d) => {
-    await d.getByLabel("Payment name").fill("Deposit");
-    await d.getByLabel("Amount (₦)").fill("600000");
-  });
-  const launchStep = page.getByRole("listitem").filter({ has: page.getByRole("heading", { name: /Launch assets/ }) });
-  await launchStep.getByRole("button", { name: /Payment when accepted/ }).click();
-  const drawer = page.getByRole("dialog");
-  await expect(drawer).toContainText('Becomes due when "Launch assets" is accepted.');
-  await drawer.getByLabel("Payment name").fill("Balance");
-  await drawer.getByLabel("Amount (₦)").fill("900000");
-  await drawer.getByRole("button", { name: "Add to agreement" }).click();
-  await expect(page.getByRole("dialog")).toBeHidden();
-  await expect(launchStep).toContainText("Balance becomes due when this is accepted");
-  await expect(page.getByRole("listitem").filter({ has: page.getByRole("heading", { name: /Agreement confirmed/ }) })).toContainText("Deposit becomes due when the agreement is confirmed");
+  await expect(canvas).toContainText("Kola Foods pays “Deposit”: ₦600,000.00");
+  await expect(canvas).toContainText("Ada Studio delivers “Launch assets” for ₦900,000.00");
 
-  // Reorder while it's a draft.
-  await page.getByRole("button", { name: 'Move "Launch assets" up' }).click();
-  await expect(page.getByRole("heading", { level: 3 }).nth(1)).toContainText("Launch assets");
-  await page.getByRole("button", { name: 'Move "Launch assets" down' }).click();
-  await expect(page.getByRole("heading", { level: 3 }).nth(1)).toContainText("Three concepts");
+  // A second workflow with its own trigger (Bubble's "+ New workflow").
+  await page.getByRole("button", { name: "New workflow" }).click();
+  const nw = page.getByRole("dialog");
+  await nw.getByLabel("When this happens").selectOption({ label: "A deliverable is accepted" });
+  await nw.getByLabel("Which deliverable").selectOption({ label: "Launch assets" });
+  await nw.getByRole("button", { name: "Create workflow" }).click();
+  await expect(canvas).toContainText("When “Launch assets” is accepted");
+  await closeSheetIfOpen(page);
+  await addStep(page, "Add a step after the trigger", "Make a payment due", async (d) => {
+    await d.getByLabel("Payment name").fill("Balance");
+    await d.getByLabel("Amount (₦)").fill("900000");
+  });
+  await expect(canvas).toContainText("Kola Foods pays “Balance”: ₦900,000.00");
+
+  // Select the step → property editor → "Only when" condition.
+  await canvas.getByRole("link", { name: /Balance/ }).click();
+  const props = properties(page);
+  await expect(props.getByRole("heading", { name: "Make a payment due", exact: true })).toBeVisible();
+  await props.getByLabel("Only when", { exact: true }).selectOption({ label: "Days since the trigger" });
+  await props.getByLabel("Is", { exact: true }).selectOption({ label: "Less than" });
+  await props.getByLabel("Days", { exact: true }).fill("30");
+  await props.getByRole("button", { name: "Save condition" }).click();
+  await expect(canvas).toContainText("Only when fewer than 30 days have passed since this workflow started");
+  await closeSheetIfOpen(page);
+
+  // The workflow list groups them; money adds up; ready to send.
+  const list = page.getByRole("navigation", { name: "Workflows" });
+  await expect(list).toContainText("When the agreement is confirmed");
+  await expect(list).toContainText("When “Launch assets” is accepted");
   await expect(page.getByRole("region", { name: "Financial position" })).toContainText("₦1,500,000.00");
-  await expect(page.getByText(/Before you can send this/)).toHaveCount(0);
-  await expectDesignGate(page, "draft agreement editor");
-  await shot(page, "s2-draft-editor", p);
-  await page.getByRole("button", { name: "Add step" }).click();
+  await expect(page.getByText("Ready to send")).toBeVisible();
+  await expectDesignGate(page, "workflow editor");
+  await shot(page, "w1-editor", p);
+  await page.getByRole("button", { name: "Add a step at the end" }).click();
   await expectDesignGate(page, "add step menu");
-  await shot(page, "s2-add-step-menu", p);
+  await shot(page, "w1-add-step-menu", p);
   await page.getByRole("dialog").getByRole("button", { name: "Close" }).click();
 
+  // Read as agreement: the same workflows as numbered clauses, then send.
+  await section(page, "Read as agreement").click();
+  const clauses = page.getByRole("region", { name: /Agreement between/ });
+  await expect(clauses).toContainText("When “Launch assets” is accepted:");
+  await expect(clauses).toContainText("a) Kola Foods pays “Balance”: ₦900,000.00, only if fewer than 30 days have passed since this workflow started.");
+  await expectDesignGate(page, "read as agreement");
+  await shot(page, "w1-read-as-agreement", p);
   await page.getByRole("button", { name: "Send for confirmation" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Send for confirmation" }).click();
   await expect(page.getByText("Sent for confirmation")).toBeVisible();
@@ -110,9 +140,16 @@ test("UJ-2: create an engagement, send it, the client signs in with a code, asks
   await client.getByLabel("Sign-in code").fill(await codeFromEmail(clientEmail));
   await client.getByRole("button", { name: "Continue" }).click();
   await expect(client.getByRole("heading", { name: "Your response" })).toBeVisible();
-  await expect(client.getByRole("heading", { name: /Three concepts/ })).toBeVisible();
+  await expect(client.getByText("Ada Studio delivers “Three concepts” for ₦600,000.00.").first()).toBeVisible();
   await expectDesignGate(client, "counterparty review and response");
-  await shot(client, "s2-client-review", p);
+  await shot(client, "w1-client-review", p);
+
+  // The client sees the same workflows, read-only.
+  await section(client, "Workflows").click();
+  await expect(client.getByRole("region", { name: "Workflow canvas" })).toContainText("When the agreement is confirmed");
+  await expect(client.getByRole("button", { name: /Add a step/ })).toHaveCount(0);
+  await expect(client.getByRole("button", { name: "New workflow" })).toHaveCount(0);
+  await section(client, "Read as agreement").click();
 
   // Confirm requires the acknowledgement.
   await client.getByRole("button", { name: "Confirm agreement" }).click();
@@ -128,13 +165,15 @@ test("UJ-2: create an engagement, send it, the client signs in with a code, asks
   await client.goto("/app");
   await expect(client.getByRole("heading", { level: 1, name: "Overview" })).toBeVisible();
 
-  // Payee revises and resends.
-  await page.goto(page.url().replace(/\?.*$/, "") + "/agreement");
+  // Payee revises the workflows and resends.
+  await page.reload();
   await expect(page.getByText("Kola Foods asked for changes")).toBeVisible();
-  await addStep(page, "Deliverable", async (d) => {
+  await section(page, "Workflows").click();
+  await addStep(page, "Add a step at the end", "Start a deliverable", async (d) => {
     await d.getByLabel("What will be delivered").fill("Social cut-downs");
     await d.getByLabel("Price (₦)").fill("0");
   });
+  await section(page, "Read as agreement").click();
   await page.getByRole("button", { name: "Send for confirmation" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Send for confirmation" }).click();
   await expect(page.getByText("Sent for confirmation")).toBeVisible();
@@ -142,20 +181,22 @@ test("UJ-2: create an engagement, send it, the client signs in with a code, asks
   // Client confirms the revised version from the new link.
   await client.goto(await linkFromEmail(clientEmail, /asked you to confirm/));
   await client.getByRole("button", { name: "Review the agreement" }).click();
-  await expect(client.getByRole("heading", { name: /Social cut-downs/ })).toBeVisible();
+  await expect(client.getByText(/Ada Studio delivers “Social cut-downs”/).first()).toBeVisible();
   await client.getByRole("checkbox").check();
   await client.getByRole("button", { name: "Confirm agreement" }).click();
   await expect(client.getByText("Agreement confirmed")).toBeVisible();
   await expect(client.getByText("Version 1", { exact: true })).toBeVisible();
 
-  // Payee sees it active, with the deposit due.
+  // Payee sees it active, locked, with the deposit due.
   await page.reload();
   await expect(page.getByText("Version 1", { exact: true })).toBeVisible();
   await expect(page.locator("[data-status='active']").first()).toBeVisible();
   await expect(page.getByRole("region", { name: "Financial position" })).toContainText("₦600,000.00");
-  await expectDesignGate(page, "active engagement overview");
-  await shot(page, "s2-active-overview", p);
-  await page.getByRole("navigation", { name: "Engagement sections" }).getByRole("link", { name: "Activity" }).click();
+  await section(page, "Workflows").click();
+  await expect(page.getByRole("button", { name: /Add a step/ })).toHaveCount(0);
+  await expectDesignGate(page, "active engagement workflows");
+  await shot(page, "w1-active", p);
+  await section(page, "Run history").click();
   await expect(page.getByText("confirmed the agreement. It is now version 1 of the shared record.")).toBeVisible();
   await clientContext.close();
 });

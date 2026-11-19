@@ -5,7 +5,7 @@ import { describeEvent } from "@/components/engagement/format";
 import { Panel } from "@/components/ui/panel";
 import { Timeline } from "@/components/ui/timeline";
 
-export const metadata = { title: "Activity" };
+export const metadata = { title: "Run history" };
 
 /** Tamper-evident timeline (FR-HIS-04). Filters and PDF export arrive in Slice 6. */
 export default async function EngagementActivity(props: { params: Promise<{ id: string }> }) {
@@ -13,7 +13,7 @@ export default async function EngagementActivity(props: { params: Promise<{ id: 
   const actor = await requireActor(`/app/engagements/${id}/activity`);
   const v = await getEngagementView(getDb(), actor, id);
   return (
-    <Panel title="Activity" description="Every action on this engagement, in order, with who did it and when. Entries can't be edited or deleted.">
+    <Panel title="Run history" description="Everything recorded on this engagement, in order, with who did it and when. When workflows start running, each run and its steps appear here. Entries can't be edited or deleted.">
       <Timeline
         events={v.events.map((e) => ({
           id: e.id,

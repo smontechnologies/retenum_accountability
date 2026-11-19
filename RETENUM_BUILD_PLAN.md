@@ -151,6 +151,16 @@ A UI slice is only done when the design system §11 checklist passes: tokens and
 - **Risks:** R-C01 (measure it); R-P02.
 - **Releasable:** **yes, to design partners** with off-platform agreements only.
 
+## Slice W1 — Workflow model and three-pane editor (D-66)
+
+- **Objective:** every engagement is built as Bubble-style workflows (trigger + numbered steps + Only when), in a three-pane editor, and the workflows are what both parties confirm.
+- **Requirements:** FR-WF-01…07; FR-ENG-12 (send rules moved to the workflow layer); FR-BAS-01…05 (snapshot includes workflows and clauses).
+- **Database:** `workflows` (trigger type and params, Only when, position, version), `workflow_steps` (action type, params, Only when, position, linked commitment for commercial steps, version). Commitments remain the commercial objects that the money logic reads.
+- **Domain (pure):** vocabulary (labels, categories, commercial flag), sentences for triggers, steps and conditions, agreement clauses, payment-due derivation from the workflow trigger, send rules.
+- **Frontend:** three-pane editor (list · canvas · property editor; mobile list → canvas → bottom sheet); trigger picker; categorised step menu; Only-when builder; Read as agreement; counterparty review on clauses plus a read-only canvas.
+- **Testing:** domain unit tests; workflow service integration tests (create, edit, reorder, remove, lock after send, snapshot, confirm → v1, counterparty view); UJ-2 rebuilt on the editor with the design gate.
+- **Not in W1:** running workflows (W2 engine), helper workflows after confirmation (W2).
+
 ## Slice 3 — Changes: agreement, authorisation, valuation, versions
 
 - **Objective:** either side proposes changes. The other side confirms, rejects or counters; the payer authorises separately; valuations are agreed or left pending; versions are tracked.
@@ -466,3 +476,31 @@ A UI slice is only done when the design system §11 checklist passes: tokens and
 - **Built:** the Agreement editor is now a Bubble-style step flow (`step-flow.tsx`, `add-step-menu.tsx`): numbered steps; dependent payments nested under their trigger; per-step "+" ("Payment when confirmed", "Payment when accepted"); "+ Add step" type menu; draft-only reorder (`moveCommitment`, audited `draft.step_moved`); the same flow read-only for the counterparty. The three-list component was removed.
 - **Not built (recorded as FR-COM-07, planned):** "only when" conditions and private automations. Not faked in the UI.
 - **Tests run:** integration +1 (reorder up/down, edge no-op, locked after sending) → engagements file 10/10. UJ-2 rewritten for the flow (add-step menu, nested payments, reorder), **passed on mobile and desktop** including the design gate on the add-step menu. Screenshots reviewed (desktop editor, mobile menu).
+
+### Slice W1: workflow model and three-pane editor (19 Nov 2026, D-66; supersedes the D-65 step flow)
+
+- **Built:**
+  - **Database:** migration `0005_workflows` (`workflows`, `workflow_steps`; draft rows at version 0, edited in place).
+  - **Domain:** pure module `domain/workflow.ts` with 13 triggers, 10 step types (Notify and Remind marked as helpers) and 6 Only-when conditions. It holds the single sentence generator shared by the canvas, the clauses and the snapshot, plus send rules, payment-trigger derivation and grouping.
+  - **Service:** `modules/engagements/workflows.ts`:
+    - add, update, remove and move for workflows and steps, with steps inserted after the trigger or after any step, and conditions on both;
+    - commercial steps create their commitment in the same transaction, and a payment's due trigger follows its workflow's trigger;
+    - things other workflows depend on can't be removed;
+    - all edits are draft-only and audited.
+  - **Engagement lifecycle:**
+    - each new engagement starts with "When the agreement is confirmed" and no steps (no templates);
+    - older engagements get workflows built once from their commitments;
+    - the confirmation snapshot includes the workflows and clauses;
+    - confirming moves workflows and steps to version 1.
+  - **UI:**
+    - the engagement opens on the three-pane editor (workflow list · canvas · property editor);
+    - below xl, the property editor is a bottom sheet, rendered in one place at a time;
+    - "+" opens a categorised step menu; "+ New workflow" opens the trigger picker; Only when uses a guided builder;
+    - "Read as agreement" shows numbered clauses with response times and Send; Run history shows the event log;
+    - the Changes, Delivery and Payments placeholder routes and the step-flow components were removed.
+- **Not built (W2):** the engine that runs workflows, live run status on the canvas, and runs in Run history. Not faked: Run history says runs will appear once workflows start running.
+- **Tests run (final code):**
+  - typecheck clean; unit and integration **125/125** (workflow domain 9; engagements integration 11, including the empty start, trigger derivation, validation, dependency protection, insertion, reorder, lock after send, v1 lock, snapshot clauses equal displayed clauses).
+  - Full e2e: 21 passed, 7 skipped by design (run-once desktop groups), 2 failed because of a wrong option label in the UJ-2 test (a wording substitution hit the editor label). After the one-line test fix, with no product change, **UJ-2 passed on mobile and desktop**, including the design gate (axe in light and dark, overflow) on the editor, the add-step menu, Read as agreement, the counterparty review and the active engagement.
+- **Review fixes from screenshots:** the amount appeared twice on step cards (removed); an empty "Days to pay" field showed 0 (now blank); the clause wording "since the trigger" became "since this workflow started".
+- **Operational:** the dev database was migrated to 0005 after stopping the dev server by PID. Stale `.next/dev/types` for the deleted routes failed the build's type check, so it was cleared.

@@ -4,13 +4,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/cn";
 
+/** D-66: the engagement is its workflows; the agreement text and the run history sit alongside. */
 const SECTIONS = [
-  { key: "", label: "Overview" },
-  { key: "agreement", label: "Agreement" },
-  { key: "changes", label: "Changes" },
-  { key: "delivery", label: "Delivery" },
-  { key: "payments", label: "Payments" },
-  { key: "activity", label: "Activity" },
+  { key: "", label: "Workflows" },
+  { key: "agreement", label: "Read as agreement" },
+  { key: "activity", label: "Run history" },
 ];
 
 /** Engagement sections (DES-11). Wraps instead of scrolling sideways on small screens. */
@@ -19,7 +17,7 @@ export function EngagementTabs({ id }: { id: string }) {
   const base = `/app/engagements/${id}`;
   return (
     <nav aria-label="Engagement sections" className="border-b border-line">
-      <ul className="grid grid-cols-3 gap-x-4 sm:flex sm:flex-wrap sm:gap-x-6">
+      <ul className="flex flex-wrap gap-x-5 sm:gap-x-6">
         {SECTIONS.map((s) => {
           const href = s.key ? `${base}/${s.key}` : base;
           const active = s.key ? pathname.startsWith(href) : pathname === base;

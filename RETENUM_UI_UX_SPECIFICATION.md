@@ -42,7 +42,7 @@ Retenum
 | **≥ 1024 (desktop)** | **Persistent sidebar** (248 px): wordmark, workspace switcher, primary nav (Overview, Engagements, Payments, Activity), then secondary nav (Business, Settings), with the user menu at the bottom |
 
 - Current location uses `aria-current="page"` plus the selected style (DES §8).
-- Engagement sections: **desktop and tablet** use a tab bar under the engagement header. **Mobile** uses an engagement overview with a **section list** (each row shows its section name, a count and the most urgent status), and each section opens as its own page with a back arrow. No horizontally scrolling tab bar.
+- Engagement sections (D-66): **Workflows · Read as agreement · Run history**, a short tab bar on every size (three items fit at 320 px). Delivery, payments and changes are expressed as workflow steps and appear in Run history as they happen. *Superseded:* desktop and tablet used a tab bar under the engagement header. **Mobile** uses an engagement overview with a **section list** (each row shows its section name, a count and the most urgent status), and each section opens as its own page with a back arrow. No horizontally scrolling tab bar.
 - **Primary action placement:** on mobile, the single most important pending action for the viewer sits in a **sticky action bar** above the bottom nav (e.g. "Review change"). On desktop it's in the engagement header's action area and the right rail.
 
 ---
@@ -178,22 +178,34 @@ Every table becomes a stacked list at < 768: one row becomes a block with its ma
 4. **Pending state:** the button shows "Confirming…" until the server responds. Nothing appears confirmed before the server acknowledges it (PWA-06).
 5. **Result:** a toast ("Agreement confirmed"), the status badge changes to *Confirmed / Active v1*, and a timeline entry appears.
 
-### 6.1a The agreement as a step flow (D-65)
+### 6.1a The engagement as Bubble-style workflows (D-66; supersedes the D-65 step flow)
+
+The engagement **is** its workflows. Sections: **Workflows** (the editor, default) · **Read as agreement** (the same workflows as numbered clauses, plus response times and Send) · **Run history** (the event log; workflow runs appear here from W2).
 
 ```
-① Agreement confirmed
-   ↳ Deposit ₦600,000 becomes due when the agreement is confirmed
-   + Payment when confirmed
-② Deliverable · Three concepts                      ₦600,000
-   Done when: …                     Edit · Remove · ↓
-   + Payment when accepted
-③ Deliverable · Launch assets                       ₦900,000
-   ↳ Balance ₦900,000 becomes due when this is accepted
-   + Payment when accepted
-[ + Add step ]  → Deliverable · What a party provides · Payment on a date · Payment when requested
+┌ Workflow list ─────────┐ ┌ Canvas ──────────────────────────┐ ┌ Property editor ─────┐
+│ Agreement              │ │ ⚡ Trigger                        │ │ Step 1               │
+│ ● When the agreement   │ │ When "Launch assets" is accepted │ │ Make a payment due   │
+│   is confirmed · 3     │ │              (+)                 │ │ Payment name [     ] │
+│ Delivery               │ │ ① Make a payment due             │ │ Amount (₦)   [     ] │
+│ ● When "Launch assets" │ │   Kola Foods pays "Balance":     │ │ ── Only when ──      │
+│   is accepted · 1      │ │   ₦900,000.00                    │ │ [Days since trigger] │
+│ Reminders              │ │   Only when fewer than 30 days…  │ │ Move up/down ·Delete │
+│ + New workflow         │ │              (+)                 │ │                      │
+└────────────────────────┘ │ [ + Add a step at the end ]      │ └──────────────────────┘
+                           └──────────────────────────────────┘
 ```
 
-The order is part of the agreement. Draft-only controls are Edit, Remove, ↑ and ↓. The counterparty sees the same flow without controls.
+- **No templates.** A new engagement has one workflow, "When the agreement is confirmed", and an empty "+". The initiator decides where every deliverable, payment and obligation goes.
+- **"+"** sits after the trigger and after every step. It opens a categorised step menu (Deliver · Pay · Provide · Approve · Notify · Control), and choosing a type opens its form. The new step is inserted at that point.
+- **"+ New workflow"** asks what starts it (13 triggers, each with its own parameter: which deliverable, which payment, a date or N days after confirmation, N working days without a response, or another workflow).
+- **Only when** is a guided builder (no free-form expressions). It is shown on the card and in the clause.
+- **Helpers** (Notify, Remind) are marked *Helper*. They never change what anyone owes, and a workflow made only of helpers is listed under Reminders.
+- **Layout:**
+  - wide (xl and up): three panes;
+  - below xl: list, then canvas, with the property editor opening as a **bottom sheet** when a trigger or step is selected. The editor is rendered in exactly one place at a time.
+- **Locking:** editable only by the initiator while it is a draft. Once sent, both parties see the same canvas without "+", move or delete controls. Once confirmed, the workflows are version 1 and change only through confirmed changes (Slice 3).
+- **Wording:** canvas, clauses and the confirmation snapshot use one sentence generator (`domain/workflow.ts`), so what is shown is exactly what is confirmed. Builder words ("trigger") stay in the editor; clauses use plain language ("since this workflow started").
 
 ### 6.2 Responding to a change: three dimensions, never merged (§19 of the PRD)
 
