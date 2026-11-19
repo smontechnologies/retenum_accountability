@@ -170,7 +170,7 @@ B2B SaaS. The initiating workspace pays a subscription priced by active engageme
 | FR-ID-02 | Email verification is required before creating a workspace or acting on an engagement | M |
 | FR-ID-03 | Login and logout. Sessions use secure, httpOnly cookies. Idle expiry 7 days; absolute expiry 30 days | M |
 | FR-ID-04 | Password reset by emailed single-use link, valid 30 minutes | M |
-| FR-ID-05 | **Lightweight counterparty identity:** an invitation link plus a 6-digit email code (valid 10 minutes, max 5 attempts) creates a passwordless user bound to the email address (D-43) | M |
+| FR-ID-05 | **Lightweight counterparty identity:** an invitation link plus a 6-digit email code (valid 10 minutes, max 5 attempts, stored hashed) creates a passwordless user bound to the email address (D-43). The link is the counterparty's way back in, so it stays usable until revoked (each resend or new submission revokes earlier links), but **it never grants access by itself**: every use requires a fresh code sent to the invited email | M |
 | FR-ID-06 | A lightweight user can later set a password and create a workspace without losing access | S |
 | FR-ID-07 | Rate limits on login, registration, password reset and code endpoints | M |
 | FR-ID-08 | Two-factor authentication (TOTP) for workspace owners and admins | S |
@@ -197,7 +197,7 @@ B2B SaaS. The initiating workspace pays a subscription priced by active engageme
 | FR-ENG-01 | A workspace member creates an engagement with a title, description, currency (NGN in the MVP) and **initiator role** (payer or payee) | M |
 | FR-ENG-02 | The counterparty is identified by organisation name, representative name and representative email. If that email belongs to a user in an existing workspace, they may link it on acceptance | M |
 | FR-ENG-03 | The engagement is a **Draft**, visible only to the initiator's workspace, until submitted | M |
-| FR-ENG-04 | Optional source document upload (PDF, image, DOCX up to 20 MB) with a "governing document" note (D-45) | M |
+| FR-ENG-04 | Optional source document upload (PDF, image, DOCX up to 20 MB) with a "governing document" note (D-45). *Built in Slice 4 with the file storage used for delivery evidence; the governing-document clause is already shown at confirmation* | M |
 | FR-ENG-05 | Response windows (working days) for: baseline, changes, deliveries, payment confirmations. Defaults 5 / 3 / 5 / 3. Shown to both before confirmation and part of the baseline | M |
 | FR-ENG-06 | Party authority: each side designates which of its people are `approver`s. The initiator defaults to the creator. The counterparty representative is automatically an approver | M |
 | FR-ENG-07 | A counterparty approver can add colleagues from their organisation as approver or contributor | S |

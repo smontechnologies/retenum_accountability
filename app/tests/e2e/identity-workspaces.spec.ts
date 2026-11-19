@@ -143,7 +143,10 @@ test("onboarding: no app screen without a workspace; New engagement always avail
   await expect(page.getByRole("main").getByRole("link", { name: "New engagement" }).first()).toBeVisible();
   await page.getByRole("main").getByRole("link", { name: "New engagement" }).first().click();
   await expect(page).toHaveURL(/\/app\/engagements\/new/);
-  await expect(page.getByText("Nothing has been created")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Continue to the agreement" })).toBeVisible();
+  // Opening the form creates nothing (FR-ENG-12).
+  await page.goto("/app/engagements");
+  await expect(page.getByText("No engagements yet")).toBeVisible();
   // Onboarding is not shown again once a workspace exists.
   await page.goto("/onboarding");
   await expect(page).toHaveURL(/\/app$/);

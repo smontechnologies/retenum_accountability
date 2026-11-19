@@ -4,6 +4,7 @@ import { getDb } from "@/server/db/client";
 import { requireActor } from "@/server/auth/session";
 import { getUserTheme } from "@/server/modules/preferences/theme";
 import { getCurrentWorkspace } from "@/server/modules/workspaces/current";
+import { isCounterpartyAnywhere } from "@/server/modules/engagements/service";
 import { Wordmark } from "@/components/shell/brand";
 import { BottomNav, SideNav } from "@/components/shell/nav";
 import { ThemeSync } from "@/components/shell/status-banners";
@@ -17,8 +18,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const actor = await requireActor();
   const db = getDb();
   const [{ current, memberships }, theme] = await Promise.all([getCurrentWorkspace(db, actor), getUserTheme(db, actor.userId)]);
-  // FR-ONB-01: no app screen without a workspace. (Slice 2 exempts counterparty-only users, D-43.)
-  if (!current) redirect("/onboarding");
+  // FR-ONB-01: no app screen without a workspace — except counterparty-only users, who take part in
+  // engagements they were invited to without a workspace of their own (D-43).
+  if (!current && !(await isCounterpartyAnywhere(db, actor.userId))) redirect("/onboarding");
   const signOut = (
     <form action={signOutAction}>
       <p className="truncate px-3 text-caption text-fg-muted" title={actor.email}>{actor.email}</p>

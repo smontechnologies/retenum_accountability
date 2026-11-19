@@ -7,7 +7,10 @@ const SIZES = {
   sm: "text-small",
 } as const;
 
-/** Money display (DES-05): tabular figures, full precision, explicit currency, full spoken label. */
+/**
+ * Money display (DES-05): tabular figures, full precision, explicit currency. Screen readers get the
+ * full spoken amount as visually hidden text (aria-label is not permitted on a generic span).
+ */
 export function MoneyFigure({
   amountMinor,
   currency = "NGN",
@@ -21,8 +24,9 @@ export function MoneyFigure({
 }) {
   const m = money(amountMinor, currency);
   return (
-    <span className={cn("tabular whitespace-nowrap", SIZES[size], className)} aria-label={spokenMoney(m)}>
+    <span className={cn("tabular whitespace-nowrap", SIZES[size], className)}>
       <span aria-hidden>{formatMoney(m)}</span>
+      <span className="sr-only">{spokenMoney(m)}</span>
     </span>
   );
 }

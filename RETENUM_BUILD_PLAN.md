@@ -26,7 +26,7 @@ A UI slice is only done when the design system §11 checklist passes: tokens and
 | 0 | Foundation | ✅ Done (see log) | 3 d |
 | 1 | Identity and workspaces | ✅ Done (see log) | 3 d |
 | 1A | **Design system, app shell, themes and PWA** (and Slice 1 screens brought up to the design system) | ✅ Done (see log) | 4 d |
-| 2 | Engagement draft, counterparty invitation, baseline confirmation | ⏳ Next | 5 d |
+| 2 | Engagement draft, counterparty invitation, baseline confirmation | 🟡 Built; awaiting one clean full e2e run (see log) | 5 d |
 | 3 | Changes: agreement, authorisation, valuation, versions | Not started | 5 d |
 | 4 | Delivery, evidence and acceptance; party obligations | Not started | 4 d |
 | 5 | Financial record, payment requests, off-platform payments, provider abstraction, amount disputes | Not started | 5 d |
@@ -409,3 +409,54 @@ A UI slice is only done when the design system §11 checklist passes: tokens and
   - `/app/engagements/new` is a placeholder that deliberately creates nothing (no empty engagement) until Slice 2 replaces it.
 - **Requirements:** FR-ONB-01…03, FR-ENG-11 (entry point); FR-ENG-12 recorded for Slice 2.
 - **Tests run:** `pnpm test` 98 passed; `pnpm test:e2e` **21 passed, 7 skipped by design**. New: every app route redirects to onboarding until a workspace exists; onboarding passes axe in light and dark with no overflow at 390 px; New engagement visible on Overview (twice when there are no engagements) and Engagements; following it creates nothing; onboarding is not shown again once a workspace exists. Typecheck passed.
+
+### Slice 2 — Engagement draft, counterparty invitation, baseline confirmation (19 Nov 2026)
+
+**Status: built and tested; merged to `main` only after one clean full e2e run** (the final full run was invalidated by the Mac running out of memory, see below).
+
+**Built**
+- Data model (`0004_engagements`):
+  - engagements and their two parties;
+  - party members (who can act for each side);
+  - engagement invitations;
+  - commitments plus commitment revisions (draft revisions are version 0; on confirmation they become version 1, and only revisions are added after that);
+  - baseline submissions with an exact snapshot (at most one open at a time, enforced by the database);
+  - engagement versions.
+- Domain (pure, unit-tested): the engagement lifecycle; the baseline summary (agreed, scheduled, unscheduled); the **no-empty-engagement** submission rules (FR-ENG-12); due amounts for on-confirmation and on-date payments.
+- Engagement policy (who can view, edit the draft, submit, withdraw, resend or respond). Non-parties, and counterparties before the first submission, get "not found".
+- Service:
+  - create draft (plan limit; counterparty must not be yourself);
+  - add, edit and remove deliverables, party obligations and payments, with validation and linked-item protection;
+  - response windows;
+  - submit (problems listed; snapshot; working-day deadline; new link, older links revoked; email);
+  - resend; withdraw;
+  - respond: confirm (with acknowledgement, against the exact submission reviewed), request changes, or decline;
+  - all with tamper-evident events and emails.
+- Counterparty access: `/e/[token]` plus a **6-digit email code** (Better Auth email OTP: hashed, 10 min, 5 attempts). No password and no workspace needed. The link alone never grants access; a member of the initiating business can't accept it. Onboarding exempts counterparty-only users.
+- Screens:
+  - New engagement;
+  - Engagements list;
+  - engagement workspace header (status, version, other party, your role) with the ledger (agreed, paid, outstanding, due now);
+  - section tabs;
+  - Overview (what needs attention, summary, recent activity);
+  - Agreement: the draft editor with drawers, totals, response times, readiness checklist and send; the counterparty review with Confirm / Ask for changes / Decline;
+  - Activity timeline;
+  - Changes / Delivery / Payments placeholders that state when they open;
+  - Overview now shows real "needs your response", money position and in-progress items.
+
+**Requirements:** FR-ENG-01…03, 05, 06, 08…12; FR-COM-01…05; FR-BAS-01…05; FR-ID-05; FR-HIS-01/04 (basic); NOT-02/03/04 (baseline); AC-BAS-1/2; FR-ONB-01 exemption. **Deferred:** FR-ENG-04 source-document upload → Slice 4 (file storage); FR-ENG-07 counterparty colleagues (S).
+
+**Tests actually run**
+- `pnpm test`: **12 files, 114 tests passed**. New:
+  - 7 domain tests (every lifecycle transition allowed or refused; totals; empty engagement blocked; payment rules; unscheduled warning; due rules);
+  - 9 integration tests (draft creation, self-counterparty refused, plan limit, non-member, validation, linked-item protection, then the full journey: hidden draft → submit → edits locked → wrong-email and own-team link refusal → code sign-in creates a verified, named user → request changes → counterparty sees the last snapshot → resubmit revokes the old link → stale submission refused → confirm → v1, deposit due, revisions moved to v1, history chain verifies → decline and withdraw).
+- `pnpm typecheck` passed.
+- E2E: **UJ-2 passed on mobile and desktop on the final code**: create → add deliverables and payments → send → client code sign-in → acknowledgement required → ask for changes → counterparty not forced into onboarding → revise and resend → confirm → both sides Active v1 → deposit due → activity entry. It includes the **design gate at 5 points** (draft editor, add-item drawer, counterparty link page, counterparty review, active overview): axe WCAG 2.2 AA in light and dark plus no overflow at 320 px.
+- The full suite passed **23/23 (7 skipped by design)** before the final visual fixes (ledger layout on phones, quieter Remove buttons, status-bound alerts). The full re-run after those fixes was **invalid**: the Mac hit memory exhaustion (5.7 GB swap, load average 95, Spotlight indexing) and tests timed out at 20–40 minutes. It must be re-run on an idle machine before merging.
+
+**Bugs found and fixed during verification**
+1. **Accessibility:** `MoneyFigure` used `aria-label` on a generic span (not permitted). The spoken amount is now visually-hidden text.
+2. **Layout:** on phones, large ledger figures overlapped the next column (the overflow check can't see overlaps). Phones now show one figure per row.
+3. `revalidatePath` was given a literal URL with `type: "layout"`, so the engagement header didn't refresh after actions. It now uses the route pattern `/app/engagements/[id]`, per the Next.js docs.
+4. One-off "sent" and "confirmed" messages tied to the URL could contradict the real status after a reload. They now show only when the status matches.
+5. Remove buttons on every draft row were visually loud. They're now quiet buttons with a trash icon; the confirmation stays destructive.

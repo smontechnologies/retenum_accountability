@@ -1,6 +1,7 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
+import { emailOTP } from "better-auth/plugins";
 import { getDb, type Database } from "../db/client";
 import { account, session, user, verification } from "../db/schema";
 import { env } from "../lib/env";
@@ -50,7 +51,24 @@ export function createAuth(db: Database, options: { secret?: string; baseURL?: s
     },
     rateLimit: { enabled: e.NODE_ENV === "production", window: 60, max: 30 },
     // Lets server actions set the session cookie. Only inside Next.js request scope.
-    plugins: options.nextJs ? [nextCookies()] : [],
+    plugins: [
+      // FR-ID-05: counterparties get a 6-digit email code instead of a password (D-43).
+      emailOTP({
+        otpLength: 6,
+        expiresIn: 10 * 60,
+        allowedAttempts: 5,
+        storeOTP: "hashed",
+        sendVerificationOTP: async ({ email, otp, type }) => {
+          if (type !== "sign-in") return;
+          await enqueueEmail(db, {
+            to: email,
+            subject: `Your Retenum sign-in code: ${otp}`,
+            text: `Your sign-in code is ${otp}. It expires in 10 minutes.\n\nIf you didn't ask for this, you can ignore this email.`,
+          });
+        },
+      }),
+      ...(options.nextJs ? [nextCookies()] : []),
+    ],
   });
 }
 

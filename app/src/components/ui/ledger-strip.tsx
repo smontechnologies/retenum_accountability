@@ -21,21 +21,28 @@ export function LedgerStrip({ figures, currency = "NGN" }: { figures: LedgerFigu
     { label: "Outstanding", value: figures.outstanding, primary: true },
   ];
   if (figures.disputed !== undefined) cells.push({ label: "Disputed", value: figures.disputed });
+  // Phones: one row per figure (label left, amount right) so large amounts never collide.
+  // Tablets: two columns. Desktop: one row with hairline dividers and large figures.
   return (
     <section aria-label="Financial position" className="rounded-panel border border-line">
-      <dl className="grid grid-cols-2 lg:flex lg:divide-x lg:divide-line">
+      <dl className="divide-y divide-line md:grid md:grid-cols-2 md:divide-y-0 lg:flex lg:divide-x">
         {cells.map((c, i) => (
           <div
             key={c.label}
             className={
-              "min-w-0 px-4 py-3 lg:flex-1 lg:px-5 lg:py-4 " +
-              (i % 2 === 1 ? "border-l border-line lg:border-l-0 " : "") +
-              (i >= 2 ? "border-t border-line lg:border-t-0" : "")
+              "flex min-w-0 items-baseline justify-between gap-3 px-4 py-3 md:block lg:flex-1 lg:px-5 lg:py-4 " +
+              (i % 2 === 1 ? "md:border-l md:border-line lg:border-l-0 " : "") +
+              (i >= 2 ? "md:border-t md:border-line lg:border-t-0" : "")
             }
           >
             <dt className="text-caption text-fg-muted">{c.label}</dt>
-            <dd className="mt-1">
-              <MoneyFigure amountMinor={c.value} currency={currency} size={c.primary ? "xl" : "md"} />
+            <dd className="min-w-0 md:mt-1">
+              <MoneyFigure
+                amountMinor={c.value}
+                currency={currency}
+                size="md"
+                className={c.primary ? "font-semibold md:text-figure-xl md:leading-[2.25rem] md:font-medium" : ""}
+              />
             </dd>
           </div>
         ))}

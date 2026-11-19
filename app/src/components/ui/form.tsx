@@ -35,6 +35,8 @@ export function ActionForm({
   variant = "primary",
   block = false,
   showSuccessInline = true,
+  onSuccess,
+  disabled = false,
 }: {
   action: Action;
   submitLabel: string;
@@ -44,6 +46,10 @@ export function ActionForm({
   variant?: ButtonVariant;
   block?: boolean;
   showSuccessInline?: boolean;
+  /** Called once per successful submission (e.g. to close a drawer). */
+  onSuccess?: () => void;
+  /** Disable submission (the reason must be shown nearby). */
+  disabled?: boolean;
 }) {
   const online = useOnline();
   const toast = useToast();
@@ -85,11 +91,12 @@ export function ActionForm({
 
   const lastToasted = useRef<FormState | null>(null);
   useEffect(() => {
-    if (state.status === "success" && successToast && lastToasted.current !== state) {
+    if (state.status === "success" && lastToasted.current !== state) {
       lastToasted.current = state;
-      toast(state.message ?? successToast);
+      if (successToast) toast(state.message ?? successToast);
+      onSuccess?.();
     }
-  }, [state, successToast, toast]);
+  }, [state, successToast, toast, onSuccess]);
 
   return (
     <form ref={formRef} action={formAction} onSubmit={onSubmit} className="space-y-5" noValidate>
@@ -119,7 +126,7 @@ export function ActionForm({
         )}
         {children}
         <div className="space-y-2">
-          <Button type="submit" variant={variant} loading={pending} disabled={!online} block={block} className={block ? "" : "w-full sm:w-auto"}>
+          <Button type="submit" variant={variant} loading={pending} disabled={!online || disabled} block={block} className={block ? "" : "w-full sm:w-auto"}>
             {pending ? pendingLabel : submitLabel}
           </Button>
           {!online && (

@@ -74,9 +74,14 @@ export function ConfirmAction({
   action,
   hidden,
   successToast,
+  confirmVariant,
+  triggerIcon,
 }: {
   trigger: string;
   triggerVariant?: ButtonVariant;
+  /** Style of the confirm button; defaults to destructive when the trigger is destructive. */
+  confirmVariant?: ButtonVariant;
+  triggerIcon?: ReactNode;
   title: string;
   consequence: ReactNode;
   confirmLabel: string;
@@ -87,7 +92,7 @@ export function ConfirmAction({
   const [open, setOpen] = useState(false);
   return (
     <>
-      <Button type="button" size="sm" variant={triggerVariant} onClick={() => setOpen(true)}>
+      <Button type="button" size="sm" variant={triggerVariant} onClick={() => setOpen(true)} icon={triggerIcon}>
         {trigger}
       </Button>
       <Dialog open={open} onClose={() => setOpen(false)} title={title}>
@@ -96,7 +101,7 @@ export function ConfirmAction({
           <Button type="button" variant="ghost" autoFocus onClick={() => setOpen(false)} className="w-full sm:w-auto">
             Cancel
           </Button>
-          <ActionForm action={action} submitLabel={confirmLabel} variant={triggerVariant === "destructive" ? "destructive" : "primary"} successToast={successToast} showSuccessInline={false}>
+          <ActionForm action={action} submitLabel={confirmLabel} variant={confirmVariant ?? (triggerVariant === "destructive" ? "destructive" : "primary")} successToast={successToast} showSuccessInline={false}>
             {Object.entries(hidden).map(([k, v]) => (
               <input key={k} type="hidden" name={k} value={v} />
             ))}
