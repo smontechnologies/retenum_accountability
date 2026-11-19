@@ -19,7 +19,7 @@ import {
   submitForConfirmation,
   withdrawEngagement,
 } from "@/server/modules/engagements/service";
-import { addStep, addWorkflow, moveStep, moveWorkflow, removeStep, removeWorkflow, setStepCondition, updateStep, updateWorkflowTrigger } from "@/server/modules/engagements/workflows";
+import { addStep, addWorkflow, guidedStart, moveStep, moveWorkflow, removeStep, removeWorkflow, setStepCondition, setWorkflowCondition, updateStep, updateWorkflowTrigger } from "@/server/modules/engagements/workflows";
 import { createWorkspace } from "@/server/modules/workspaces/service";
 
 let db: Database;
@@ -149,10 +149,11 @@ describe("workflows: building the agreement (D-66, FR-WF-01…06, FR-ENG-12)", (
     const { id, main, conceptsStep, launch, onLaunch } = await readyDraft(actor, workspaceId, "edit-client@client.ng");
     expect((await code(addStep(db, actor, id, main, "start_deliverable", { title: "Bad", price: "12.345" }))).details).toMatchObject({ fields: { price: expect.any(String) } });
     expect((await code(addWorkflow(db, actor, id, { triggerType: "" }))).code).toBe("VALIDATION");
-    expect((await code(setStepCondition(db, actor, id, conceptsStep, { conditionType: "delivered_before", conditionCommitmentId: launch }))).details).toMatchObject({ fields: { conditionDate: expect.any(String) } });
-    await setStepCondition(db, actor, id, conceptsStep, { conditionType: "outstanding_amount", conditionOp: "less", conditionAmount: "50,000" });
+    const { id: note } = await addStep(db, actor, id, main, "notify", { who: "payer", message: "Heads up" });
+    expect((await code(setStepCondition(db, actor, id, note, { conditionType: "delivered_before", conditionCommitmentId: launch }))).details).toMatchObject({ fields: { conditionDate: expect.any(String) } });
+    await setStepCondition(db, actor, id, note, { conditionType: "outstanding_amount", conditionOp: "less", conditionAmount: "50,000" });
     const v = await getEngagementView(db, actor, id);
-    expect(v.workflows[0]!.steps.find((x) => x.id === conceptsStep)!.onlyWhen).toEqual({ type: "outstanding_amount", op: "less", amountMinor: "5000000" });
+    expect(v.workflows[0]!.steps.find((x) => x.id === note)!.onlyWhen).toEqual({ type: "outstanding_amount", op: "less", amountMinor: "5000000" });
     // The Launch assets step is watched by another workflow: can't be removed.
     const launchStep = v.workflows[0]!.steps.find((x) => x.commitment?.id === launch)!;
     expect((await code(removeStep(db, actor, id, launchStep.id))).message).toMatch(/refers to this/);
@@ -189,6 +190,59 @@ describe("workflows: building the agreement (D-66, FR-WF-01…06, FR-ENG-12)", (
     expect((await code(addStep(db, actor, id, main, "notify", { who: "both" }))).code).toBe("CONFLICT");
     expect((await code(moveStep(db, actor, id, conceptsStep, "down"))).code).toBe("CONFLICT");
     expect((await code(addWorkflow(db, actor, id, { triggerType: "change_confirmed" }))).code).toBe("CONFLICT");
+  });
+});
+
+describe("guided start and the money guardrail (D-67)", () => {
+  const fresh = async (tag: string) => {
+    const { actor, workspaceId } = await payeeWithWorkspace(tag);
+    const { id } = await createDraft(db, actor, { workspaceId, title: "Kitchen", initiatorSide: "payee", counterpartyOrg: "Kola Foods", counterpartyName: "N", counterpartyEmail: `${tag}-c@c.ng` });
+    return { actor, id };
+  };
+  const answers = { d_title_0: "Design", d_price_0: "400000", d_title_1: "Build", d_price_1: "1,100,000", d_due_1: "2027-04-01", plan: "deposit_balance", deposit: "30%", balanceWhen: "final_accepted", termsDays: "5", provides: "Site access", providesBy: "2027-01-15" };
+
+  it("generates ordinary, ready-to-send workflows from a few answers", async () => {
+    const { actor, id } = await fresh("guided");
+    await guidedStart(db, actor, id, answers);
+    const v = await getEngagementView(db, actor, id);
+    expect(v.problems).toEqual([]);
+    expect(v.summary.agreedMinor).toBe(150_000_000n);
+    expect(v.summary.scheduledMinor).toBe(150_000_000n);
+    expect(v.clauses.map((c) => c.text)).toEqual(["When the agreement is confirmed:", "When “Build” is accepted:"]);
+    expect(v.clauses[0]!.lines[0]).toBe("a) Kola Foods pays “Deposit”: ₦450,000.00, within 5 days.");
+    expect(v.clauses[1]!.lines).toEqual(["a) Kola Foods pays “Balance”: ₦1,050,000.00, within 5 days."]);
+    const build = v.items.find((c) => c.title === "Build")!;
+    expect(v.items.find((c) => c.title === "Balance")).toMatchObject({ trigger: "on_acceptance", linkedCommitmentId: build.id });
+    expect(v.items.find((c) => c.title === "Site access")).toMatchObject({ kind: "party_obligation", owedBySide: "payer", dueDate: "2027-01-15" });
+    // It's never run over existing work.
+    expect((await code(guidedStart(db, actor, id, answers))).message).toMatch(/already has steps/);
+    // And everything stays editable like any workflow.
+    await addStep(db, actor, id, v.workflows[0]!.id, "start_deliverable", { title: "Snagging", price: "0" });
+    expect((await getEngagementView(db, actor, id)).items.map((c) => c.title)).toContain("Snagging");
+  });
+
+  it("reports answer problems against their fields and creates nothing", async () => {
+    const { actor, id } = await fresh("guided-bad");
+    const err = await code(guidedStart(db, actor, id, { ...answers, deposit: "2,000,000" }));
+    expect(err.details).toMatchObject({ fields: { deposit: "The deposit must be less than the total (₦1,500,000.00)" } });
+    expect((await getEngagementView(db, actor, id)).items).toEqual([]);
+  });
+
+  it("refuses conditions that would decide whether money is owed", async () => {
+    const { actor, id } = await fresh("guard");
+    await guidedStart(db, actor, id, { ...answers, plan: "per_deliverable" });
+    const v = await getEngagementView(db, actor, id);
+    const payStep = v.workflows[1]!.steps[0]!;
+    const cond = { conditionType: "days_since_trigger", conditionOp: "less", conditionDays: "30" };
+    expect((await code(setStepCondition(db, actor, id, payStep.id, cond))).message).toMatch(/can't decide whether money is owed/);
+    expect((await code(setWorkflowCondition(db, actor, id, v.workflows[1]!.id, cond))).message).toMatch(/can't decide whether money is owed/);
+    // Helpers can be conditional; a conditional workflow can't then take money.
+    const { id: remindFlow } = await addWorkflow(db, actor, id, { triggerType: "no_response", days: "3" });
+    const { id: remind } = await addStep(db, actor, id, remindFlow, "remind", { who: "payer", afterDays: "1" });
+    await setStepCondition(db, actor, id, remind, cond);
+    await setWorkflowCondition(db, actor, id, remindFlow, { conditionType: "change_confirmed" });
+    expect((await code(addStep(db, actor, id, remindFlow, "make_payment_due", { title: "Sneaky", amount: "1" }))).message).toMatch(/can't contain money/);
+    expect((await getEngagementView(db, actor, id)).problems).toEqual([]);
   });
 });
 

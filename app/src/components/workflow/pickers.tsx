@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Plus } from "lucide-react";
-import { ACTIONS, CATEGORY_ORDER, type ActionType } from "@/domain/workflow";
+import { ACTIONS, CATEGORY_ORDER, V1_ACTIONS, type ActionType } from "@/domain/workflow";
 import { addStepAction, addWorkflowAction } from "@/app/app/engagements/actions";
 import { Dialog } from "@/components/ui/dialog";
 import { ActionForm } from "@/components/ui/form";
@@ -44,7 +44,8 @@ export function AddStepButton({ options, workflowId, insertAfter, label = "Add a
         <div className="space-y-5">
           {CATEGORY_ORDER.map((cat) => {
             const Icon = CATEGORY_ICON[cat];
-            const items = (Object.keys(ACTIONS) as ActionType[]).filter((a) => ACTIONS[a].category === cat);
+            const items = V1_ACTIONS.filter((a) => ACTIONS[a].category === cat);
+            if (items.length === 0) return null;
             return (
               <section key={cat} aria-label={cat}>
                 <h3 className="mb-2 flex items-center gap-1.5 text-caption font-semibold text-fg-secondary"><Icon aria-hidden className="size-3.5" /> {cat}</h3>

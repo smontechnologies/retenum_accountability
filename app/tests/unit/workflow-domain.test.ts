@@ -4,7 +4,11 @@ import {
   ACTIONS,
   agreementClauses,
   commitmentsOf,
+  conditionAllowedOnStep,
+  conditionAllowedOnWorkflow,
   conditionSentence,
+  V1_ACTIONS,
+  V1_TRIGGERS,
   derivePaymentTrigger,
   groupOf,
   sendProblems,
@@ -41,8 +45,8 @@ const w1: WorkflowView = {
 const w2: WorkflowView = {
   id: "w2", position: 1, triggerType: "deliverable_accepted", triggerParams: { commitmentId: "d2" }, onlyWhen: null,
   steps: [
-    step({ id: "s5", actionType: "make_payment_due", commitment: balance, onlyWhen: { type: "delivered_before", commitmentId: "d2", date: "2027-01-31" } }),
-    step({ id: "s6", actionType: "notify", params: { who: "payee", message: "Balance is now due" } }),
+    step({ id: "s5", actionType: "make_payment_due", commitment: balance }),
+    step({ id: "s6", actionType: "notify", params: { who: "payee", message: "Balance is now due" }, onlyWhen: { type: "delivered_before", commitmentId: "d2", date: "2027-01-31" } }),
   ],
 };
 const w3: WorkflowView = { id: "w3", position: 2, triggerType: "no_response", triggerParams: { days: 3 }, onlyWhen: null, steps: [step({ id: "s7", actionType: "remind", params: { who: "payer", afterDays: 1, repeatDays: 2 } })] };
@@ -85,7 +89,7 @@ describe("sentences (single source for canvas, clauses and snapshot)", () => {
     expect(clauses[1]).toEqual({
       number: 2,
       text: "When “Launch assets” is accepted:",
-      lines: ["a) Kola Foods pays “Balance”: ₦900,000.00, only if “Launch assets” was delivered before 31 Jan 2027.", "b) Notify Ada Studio: “Balance is now due”."],
+      lines: ["a) Kola Foods pays “Balance”: ₦900,000.00.", "b) Notify Ada Studio: “Balance is now due”, only if “Launch assets” was delivered before 31 Jan 2027."],
     });
   });
 });
@@ -117,6 +121,18 @@ describe("send rules (FR-ENG-12)", () => {
     expect(problems).toContain("Workflow “When “(not chosen)” is accepted” needs you to choose what it watches.");
     expect(problems).toContain("A step in “When “(not chosen)” is accepted” needs you to choose what it applies to.");
   });
+  it("refuses conditions that would decide whether money is owed (D-67)", () => {
+    const risky: WorkflowView = { ...w2, steps: [step({ id: "s5", actionType: "make_payment_due", commitment: balance, onlyWhen: { type: "days_since_trigger", op: "less", days: 30 } })] };
+    expect(sendProblems([w1, risky], ctx([w1, risky])).join(" ")).toMatch(/money step .* has a condition/);
+    const riskyWorkflow: WorkflowView = { ...w2, onlyWhen: { type: "change_confirmed" } };
+    expect(sendProblems([w1, riskyWorkflow], ctx([w1, riskyWorkflow])).join(" ")).toMatch(/has a condition but includes money/);
+    expect(conditionAllowedOnStep("notify")).toBe(true);
+    expect(conditionAllowedOnStep("make_payment_due")).toBe(false);
+    expect(conditionAllowedOnWorkflow(w3)).toBe(true);
+    expect(V1_ACTIONS).not.toContain("unlock_workflow");
+    expect(V1_TRIGGERS).not.toContain("workflow_finished");
+  });
+
   it("passes a complete agreement", () => {
     expect(sendProblems([w1, w2, w3], ctx([w1, w2, w3]))).toEqual([]);
   });

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getDb } from "@/server/db/client";
 import { requireActor } from "@/server/auth/session";
 import { getEngagementView } from "@/server/modules/engagements/service";
-import { ACTIONS, conditionSentence, stepSentence, triggerSentence, type WorkflowView } from "@/domain/workflow";
+import { ACTIONS, conditionAllowedOnStep, conditionAllowedOnWorkflow, conditionSentence, stepSentence, triggerSentence, type WorkflowView } from "@/domain/workflow";
 import type { CommitmentView } from "@/domain/baseline";
 import { Canvas } from "@/components/workflow/canvas";
 import { PropertyEditor, PropertyPane } from "@/components/workflow/editor-panel";
@@ -46,7 +46,7 @@ export default async function WorkflowEditorPage(props: { params: Promise<{ id: 
   let readOnly: React.ReactNode = null;
   let sheetTitle = "Details";
   if (wf && sp.s === "trigger") {
-    selection = { kind: "trigger", trigger: { workflowId: wf.id, triggerType: wf.triggerType, triggerParams: wf.triggerParams, onlyWhen: wf.onlyWhen }, isFirst: wIndex === 0, isLast: wIndex === v.workflows.length - 1 };
+    selection = { kind: "trigger", trigger: { workflowId: wf.id, triggerType: wf.triggerType, triggerParams: wf.triggerParams, onlyWhen: wf.onlyWhen }, isFirst: wIndex === 0, isLast: wIndex === v.workflows.length - 1, conditionAllowed: conditionAllowedOnWorkflow(wf) };
     sheetTitle = "Trigger";
     readOnly = (
       <>
@@ -70,7 +70,7 @@ export default async function WorkflowEditorPage(props: { params: Promise<{ id: 
           ? { title: c.title, price: decimal(c.priceMinor), definitionOfDone: c.definitionOfDone, quantity: c.quantity, unit: c.unit, dueDate: c.dueDate, exclusions: c.exclusions, description: c.description, termsDays: c.termsDays || null, owedBySide: c.owedBySide }
           : null,
       };
-      selection = { kind: "step", step, number: i + 1, isFirst: i === 0, isLast: i === wf.steps.length - 1 };
+      selection = { kind: "step", step, number: i + 1, isFirst: i === 0, isLast: i === wf.steps.length - 1, conditionAllowed: conditionAllowedOnStep(st.actionType) };
       sheetTitle = `Step ${i + 1}: ${ACTIONS[st.actionType].label}`;
       readOnly = (
         <>
@@ -87,8 +87,13 @@ export default async function WorkflowEditorPage(props: { params: Promise<{ id: 
 
   return (
     <div className="space-y-5">
-      {sp.created && <Alert tone="success" title="Draft created">Build the agreement with workflows: use + to add what happens, then read it as an agreement and send it to {v.other.orgName}. Nothing is shared until you send it.</Alert>}
-      {v.status === "draft" && v.viewer.isInitiatorSide && !sp.created && v.problems.length > 0 && (
+      {editable && v.workflows.every((w) => w.steps.length === 0) && (
+        <Alert tone="info" title="Start with a few questions">
+          Tell Retenum what you'll deliver and how you'll be paid, and it sets up the workflows for you. Or use + below to build them yourself.{" "}
+          <Link href={`${base}/start`} className="font-medium underline underline-offset-4">Answer the questions</Link>
+        </Alert>
+      )}
+      {v.status === "draft" && v.viewer.isInitiatorSide && v.workflows.some((w) => w.steps.length > 0) && v.problems.length > 0 && (
         <Alert tone="info" title="Before you can send this">
           <ul className="mt-1 list-disc space-y-0.5 pl-5">{v.problems.slice(0, 4).map((p) => <li key={p}>{p}</li>)}</ul>
         </Alert>

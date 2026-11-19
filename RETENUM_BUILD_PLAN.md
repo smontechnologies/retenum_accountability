@@ -504,3 +504,21 @@ A UI slice is only done when the design system §11 checklist passes: tokens and
   - Full e2e: 21 passed, 7 skipped by design (run-once desktop groups), 2 failed because of a wrong option label in the UJ-2 test (a wording substitution hit the editor label). After the one-line test fix, with no product change, **UJ-2 passed on mobile and desktop**, including the design gate (axe in light and dark, overflow) on the editor, the add-step menu, Read as agreement, the counterparty review and the active engagement.
 - **Review fixes from screenshots:** the amount appeared twice on step cards (removed); an empty "Days to pay" field showed 0 (now blank); the clause wording "since the trigger" became "since this workflow started".
 - **Operational:** the dev database was migrated to 0005 after stopping the dev server by PID. Stale `.next/dev/types` for the deleted routes failed the build's type check, so it was cleared.
+
+### D-67 proposal: guided start, v1 vocabulary, money guardrail (19 Nov 2026, branch `guided-start`)
+
+- **Why:** a critique of D-66. Target customers aren't builders; a blank canvas slows the common deal shape (deposit, deliverables, balance); conditions on money let users write penalty-like terms; chaining raises the cost of W2 and Slice 3. The founder asked to see this version end to end.
+- **Built:**
+  - `domain/guided-start.ts` (pure planner: answers → workflows; deposit as an amount or a percentage; four payment plans; field-level errors);
+  - `guidedStart` service (one transaction; refuses if steps already exist);
+  - `/app/engagements/[id]/start` page (works without JavaScript; live total and deposit/balance figures with it);
+  - new engagements go to the questions, then to Read as agreement with a "Set up from your answers" notice;
+  - an empty draft's editor offers the questions;
+  - pickers show only `V1_TRIGGERS` / `V1_ACTIONS` (chaining hidden; existing data still renders);
+  - money guardrail enforced in the domain (send rules), the service (condition and step refusals) and the UI (an explanatory note instead of the condition builder);
+  - readable Run history wording for workflow events.
+- **Tests run:**
+  - unit and integration **134/134** (guided-start planner 5; guardrail and v1 lists in the workflow domain; integration: generated agreement ready to send with exact clauses and totals, no overwrite, field errors create nothing, guardrail refusals on steps, workflows and adding money to a conditional workflow);
+  - UJ-2 rewritten for the guided path (errors, live figures, generated clauses, money note, conditional reminder, hidden chaining, send, change request, confirmation): **passed on mobile and desktop** with the design gate on the questions page.
+  - The first run failed on desktop because of test timing (the condition was entered before the pane switched to the step). The test now waits for the step heading.
+  - **Full e2e suite on the final branch code: 23 passed, 7 skipped by design (run-once desktop groups), 0 failed.**

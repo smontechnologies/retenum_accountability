@@ -22,6 +22,7 @@ import {
 import {
   addStep,
   addWorkflow,
+  guidedStart,
   moveStep,
   moveWorkflow,
   removeStep,
@@ -60,7 +61,7 @@ export async function createDraftAction(_: FormState, data: FormData): Promise<F
   } catch (err) {
     return toState(err);
   }
-  redirect(`/app/engagements/${id}?created=1`);
+  redirect(`/app/engagements/${id}/start`);
 }
 
 // ----- Workflow editor (D-66) ---------------------------------------------------------------------
@@ -133,6 +134,18 @@ export async function setConditionAction(_: FormState, data: FormData): Promise<
     (a, e) => (target === "workflow" ? setWorkflowCondition(getDb(), a, e, str(data, "workflowId"), fields(data)) : setStepCondition(getDb(), a, e, str(data, "stepId"), fields(data))),
     "Condition saved.",
   );
+}
+
+export async function guidedStartAction(_: FormState, data: FormData): Promise<FormState> {
+  const actor = await requireActor();
+  const engagementId = str(data, "engagementId");
+  try {
+    await guidedStart(getDb(), actor, engagementId, fields(data));
+  } catch (err) {
+    return toState(err);
+  }
+  refresh(engagementId);
+  redirect(`/app/engagements/${engagementId}/agreement?started=1`);
 }
 
 /** Plain form actions (no form state) for the reorder arrows. */

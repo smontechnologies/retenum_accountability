@@ -3,14 +3,14 @@
 import { ArrowDown, ArrowUp, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ACTIONS, TRIGGERS } from "@/domain/workflow";
+import { ACTIONS, CONDITION_MONEY_RULE, TRIGGERS } from "@/domain/workflow";
 import { moveAction, removeStepAction, removeWorkflowAction, setConditionAction, updateStepAction, updateTriggerAction } from "@/app/app/engagements/actions";
 import { ConfirmAction, Dialog } from "@/components/ui/dialog";
 import { ActionForm } from "@/components/ui/form";
 import { ConditionFields, StepFields, TriggerFields } from "./fields";
 import type { EditableStep, EditableTrigger, EditorOptions } from "./types";
 
-type Selection = { kind: "trigger"; trigger: EditableTrigger; isFirst: boolean; isLast: boolean } | { kind: "step"; step: EditableStep; number: number; isFirst: boolean; isLast: boolean };
+type Selection = ({ kind: "trigger"; trigger: EditableTrigger } | { kind: "step"; step: EditableStep; number: number }) & { isFirst: boolean; isLast: boolean; conditionAllowed: boolean };
 
 /** Right pane: the property editor for the selected trigger or step (Bubble's property editor). */
 export function PropertyEditor({ options, selection, editable, readOnly }: { options: EditorOptions; selection: Selection | null; editable: boolean; readOnly: React.ReactNode }) {
@@ -30,12 +30,16 @@ export function PropertyEditor({ options, selection, editable, readOnly }: { opt
           </ActionForm>
         </section>
         <section aria-label="Workflow condition" className="space-y-3 border-t border-line pt-6">
-          <ActionForm key={`c-${t.workflowId}`} action={setConditionAction} submitLabel="Save condition" successToast="Condition saved." showSuccessInline={false}>
-            <input type="hidden" name="engagementId" value={options.engagementId} />
-            <input type="hidden" name="target" value="workflow" />
-            <input type="hidden" name="workflowId" value={t.workflowId} />
-            <ConditionFields options={options} condition={t.onlyWhen} />
-          </ActionForm>
+          {selection.conditionAllowed ? (
+            <ActionForm key={`c-${t.workflowId}`} action={setConditionAction} submitLabel="Save condition" successToast="Condition saved." showSuccessInline={false}>
+              <input type="hidden" name="engagementId" value={options.engagementId} />
+              <input type="hidden" name="target" value="workflow" />
+              <input type="hidden" name="workflowId" value={t.workflowId} />
+              <ConditionFields options={options} condition={t.onlyWhen} />
+            </ActionForm>
+          ) : (
+            <MoneyNote what="This workflow includes money, so it always runs when triggered." />
+          )}
         </section>
         <section aria-label="Workflow actions" className="flex flex-wrap items-center gap-1 border-t border-line pt-6">
           <MoveButtons hidden={{ ...hidden, workflowId: t.workflowId }} isFirst={selection.isFirst} isLast={selection.isLast} label="workflow" />
@@ -68,12 +72,16 @@ export function PropertyEditor({ options, selection, editable, readOnly }: { opt
         </ActionForm>
       </section>
       <section aria-label="Step condition" className="space-y-3 border-t border-line pt-6">
-        <ActionForm key={`c-${s.id}`} action={setConditionAction} submitLabel="Save condition" successToast="Condition saved." showSuccessInline={false}>
-          <input type="hidden" name="engagementId" value={options.engagementId} />
-          <input type="hidden" name="target" value="step" />
-          <input type="hidden" name="stepId" value={s.id} />
-          <ConditionFields options={options} condition={s.onlyWhen} />
-        </ActionForm>
+        {selection.conditionAllowed ? (
+          <ActionForm key={`c-${s.id}`} action={setConditionAction} submitLabel="Save condition" successToast="Condition saved." showSuccessInline={false}>
+            <input type="hidden" name="engagementId" value={options.engagementId} />
+            <input type="hidden" name="target" value="step" />
+            <input type="hidden" name="stepId" value={s.id} />
+            <ConditionFields options={options} condition={s.onlyWhen} />
+          </ActionForm>
+        ) : (
+          <MoneyNote what="This step is about money, so it always happens when its workflow runs." />
+        )}
       </section>
       <section aria-label="Step actions" className="flex flex-wrap items-center gap-1 border-t border-line pt-6">
         <MoveButtons hidden={{ ...hidden, stepId: s.id }} isFirst={selection.isFirst} isLast={selection.isLast} label="step" />
@@ -89,6 +97,15 @@ export function PropertyEditor({ options, selection, editable, readOnly }: { opt
           hidden={{ ...hidden, stepId: s.id, workflowId: s.workflowId }}
         />
       </section>
+    </div>
+  );
+}
+
+function MoneyNote({ what }: { what: string }) {
+  return (
+    <div className="space-y-1">
+      <p className="text-small font-medium">Only when</p>
+      <p className="text-small text-fg-secondary">{what} {CONDITION_MONEY_RULE.replace(/^Conditions can't decide whether money is owed\. /, "")}</p>
     </div>
   );
 }

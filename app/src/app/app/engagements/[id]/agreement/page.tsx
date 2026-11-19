@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getDb } from "@/server/db/client";
 import { requireActor } from "@/server/auth/session";
 import { getEngagementView } from "@/server/modules/engagements/service";
@@ -15,9 +16,9 @@ import { resendAction, saveResponseWindowsAction, submitAction, withdrawAction }
 
 export const metadata = { title: "Read as agreement" };
 
-export default async function AgreementPage(props: { params: Promise<{ id: string }>; searchParams: Promise<{ responded?: string; sent?: string }> }) {
+export default async function AgreementPage(props: { params: Promise<{ id: string }>; searchParams: Promise<{ responded?: string; sent?: string; started?: string }> }) {
   const { id } = await props.params;
-  const { responded, sent } = await props.searchParams;
+  const { responded, sent, started } = await props.searchParams;
   const actor = await requireActor(`/app/engagements/${id}/agreement`);
   const v = await getEngagementView(getDb(), actor, id);
   const payer = v.parties.find((p) => p.side === "payer")!;
@@ -29,6 +30,11 @@ export default async function AgreementPage(props: { params: Promise<{ id: strin
 
   return (
     <div className="space-y-6">
+      {started && v.status === "draft" && (
+        <Alert tone="success" title="Set up from your answers">
+          This is the agreement Retenum wrote from your answers. Read it through, change anything in <Link href={`/app/engagements/${id}`} className="font-medium underline underline-offset-4">Workflows</Link>, then send it to {v.other.orgName}.
+        </Alert>
+      )}
       {sent && v.status === "awaiting_confirmation" && <Alert tone="success" title="Sent for confirmation">{v.other.orgName} has been emailed a link. You'll be notified when they respond.</Alert>}
       {responded === "confirm" && v.status === "active" && <Alert tone="success" title="Agreement confirmed">This is now version 1 of the shared record.</Alert>}
       {responded === "request_changes" && v.status === "draft" && <Alert tone="success" title="Request sent">{v.other.orgName} will revise the agreement and send it again.</Alert>}

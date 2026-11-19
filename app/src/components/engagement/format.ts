@@ -30,6 +30,24 @@ export function describeEvent(type: string, data: Record<string, unknown>): stri
       return `removed "${String(data.title)}" from the draft.`;
     case "draft.step_moved":
       return `moved a step ${String(data.direction)} in the draft.`;
+    case "draft.guided_start":
+      return "set up the agreement from the guided questions.";
+    case "draft.workflow_added":
+      return "added a workflow to the draft.";
+    case "draft.workflow_updated":
+      return "changed a workflow trigger in the draft.";
+    case "draft.workflow_removed":
+      return "removed a workflow from the draft.";
+    case "draft.workflow_moved":
+      return `moved a workflow ${String(data.direction)} in the draft.`;
+    case "draft.step_added":
+      return "added a step to the draft.";
+    case "draft.step_updated":
+      return "edited a step in the draft.";
+    case "draft.step_removed":
+      return "removed a step from the draft.";
+    case "draft.condition_set":
+      return data.condition ? "set an \"Only when\" condition in the draft." : "removed an \"Only when\" condition from the draft.";
     case "draft.response_windows_updated":
       return "updated the response times.";
     case "baseline.submitted":

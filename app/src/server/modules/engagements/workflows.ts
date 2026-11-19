@@ -1,8 +1,12 @@
 import { and, asc, eq, inArray, isNull, max } from "drizzle-orm";
 import { z } from "zod";
 import type { CommitmentView, Side } from "@/domain/baseline";
+import { answersFromFields, planFromAnswers } from "@/domain/guided-start";
 import {
   ACTIONS,
+  CONDITION_MONEY_RULE,
+  conditionAllowedOnStep,
+  MONEY_ACTIONS,
   derivePaymentTrigger,
   TRIGGERS,
   type ActionType,
@@ -280,6 +284,10 @@ export async function setWorkflowCondition(db: Database, actor: Actor, engagemen
   const cond = conditionFrom(parse(ConditionInput, input));
   await tx(db, async (t) => {
     await loadWorkflowRow(t, engagementId, workflowId);
+    if (cond) {
+      const money = await t.select({ id: workflowSteps.id }).from(workflowSteps).where(and(eq(workflowSteps.workflowId, workflowId), inArray(workflowSteps.actionType, MONEY_ACTIONS)));
+      if (money.length > 0) throw conflict(CONDITION_MONEY_RULE);
+    }
     await t.update(workflows).set({ onlyWhen: cond as Record<string, unknown> | null }).where(eq(workflows.id, workflowId));
     await touch(t, engagementId);
     await appendEvent(t, { engagementId, type: "draft.condition_set", actorUserId: actor.userId, actorSide: viewer.side, target: { kind: "workflow", id: workflowId }, data: { condition: cond?.type ?? null } });
@@ -302,6 +310,7 @@ export async function addStep(db: Database, actor: Actor, engagementId: string, 
   const items = await loadCommitments(db, engagementId, 0);
   return tx(db, async (t) => {
     const w = await loadWorkflowRow(t, engagementId, workflowId);
+    if (w.onlyWhen && MONEY_ACTIONS.includes(actionType)) throw conflict(`This workflow has a condition, so it can't contain money. ${CONDITION_MONEY_RULE}`);
     let commitmentId: string | null = null;
     let params: StepParams = {};
     const kind = COMMERCIAL_KIND[actionType];
@@ -406,7 +415,8 @@ export async function setStepCondition(db: Database, actor: Actor, engagementId:
   const { viewer } = await authorise(db, actor, engagementId, "engagement.edit_draft");
   const cond = conditionFrom(parse(ConditionInput, input));
   await tx(db, async (t) => {
-    await loadStepRow(t, engagementId, stepId);
+    const { s } = await loadStepRow(t, engagementId, stepId);
+    if (cond && !conditionAllowedOnStep(s.actionType as ActionType)) throw conflict(CONDITION_MONEY_RULE);
     await t.update(workflowSteps).set({ onlyWhen: cond as Record<string, unknown> | null }).where(eq(workflowSteps.id, stepId));
     await touch(t, engagementId);
     await appendEvent(t, { engagementId, type: "draft.condition_set", actorUserId: actor.userId, actorSide: viewer.side, target: { kind: "workflow_step", id: stepId }, data: { condition: cond?.type ?? null } });
@@ -414,3 +424,45 @@ export async function setStepCondition(db: Database, actor: Actor, engagementId:
 }
 
 export type { CommitmentView };
+
+/**
+ * Guided start (D-67): turn a few answers into ordinary workflows in one transaction. Only on a
+ * draft with no steps yet, so it never overwrites someone's work.
+ */
+export async function guidedStart(db: Database, actor: Actor, engagementId: string, input: Record<string, unknown>) {
+  const { engagement, viewer } = await authorise(db, actor, engagementId, "engagement.edit_draft");
+  const existing = await loadWorkflows(db, engagementId, 0);
+  if (existing.some((w) => w.steps.length > 0)) throw conflict("This engagement already has steps. Change them in Workflows.");
+  const answers = answersFromFields(input);
+  const { workflows: plan, errors } = planFromAnswers(answers);
+  if (Object.keys(errors).length > 0) throw validationError("Some details need fixing.", { fields: errors });
+  await tx(db, async (t) => {
+    for (const w of existing) await t.delete(workflows).where(eq(workflows.id, w.id));
+    let position = await nextPosition(t, engagementId);
+    const deliverableIds = new Map<number, string>();
+    for (const [wi, pw] of plan.entries()) {
+      const wid = newId();
+      const triggerParams: TriggerParams =
+        pw.trigger === "deliverable_accepted" ? { commitmentId: deliverableIds.get(pw.watchesDeliverable!) } : pw.trigger === "date_reached" ? { date: pw.date } : {};
+      await t.insert(workflows).values({ id: wid, engagementId, position: wi, triggerType: pw.trigger, triggerParams: triggerParams as Record<string, unknown>, createdBySide: viewer.side });
+      const derived = derivePaymentTrigger({ triggerType: pw.trigger, triggerParams });
+      for (const [si, ps] of pw.steps.entries()) {
+        const kind = COMMERCIAL_KIND[ps.action]!;
+        const { owedBySide, values } = revisionValues(kind, { ...ps.input, kind, trigger: "on_confirmation" } as CommitmentInput, engagement.currency, []);
+        const cid = newId();
+        await t.insert(commitments).values({ id: cid, engagementId, kind, owedBySide: kind === "deliverable" ? "payee" : owedBySide!, position: position++ });
+        await t.insert(commitmentRevisions).values({
+          id: newId(),
+          commitmentId: cid,
+          versionFrom: 0,
+          ...values,
+          ...(kind === "payment_obligation" ? { trigger: derived.trigger, triggerDate: derived.triggerDate, linkedCommitmentId: derived.linkedCommitmentId } : {}),
+        });
+        if (ps.action === "start_deliverable") deliverableIds.set(ps.deliverableIndex!, cid);
+        await t.insert(workflowSteps).values({ id: newId(), workflowId: wid, position: si, actionType: ps.action, params: {}, commitmentId: cid });
+      }
+    }
+    await touch(t, engagementId);
+    await appendEvent(t, { engagementId, type: "draft.guided_start", actorUserId: actor.userId, actorSide: viewer.side, target: { kind: "engagement", id: engagementId }, data: { plan: answers.plan, workflows: plan.length } });
+  });
+}

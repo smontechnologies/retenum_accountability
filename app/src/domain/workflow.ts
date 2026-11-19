@@ -116,6 +116,24 @@ export const ACTIONS: Record<ActionType, { label: string; category: Category; co
 
 export const CATEGORY_ORDER: Category[] = ["Deliver", "Pay", "Provide", "Approve", "Notify", "Control"];
 
+/**
+ * D-67: v1 offers a smaller vocabulary. Chaining (unlock / stop / "another workflow finishes") can
+ * create loops and contradictions both parties must read identically; it returns when customers ask.
+ */
+export const V1_TRIGGERS: TriggerType[] = (Object.keys(TRIGGERS) as TriggerType[]).filter((t) => t !== "workflow_finished");
+export const V1_ACTIONS: ActionType[] = (Object.keys(ACTIONS) as ActionType[]).filter((a) => a !== "unlock_workflow" && a !== "stop_workflow");
+
+/**
+ * D-67 money guardrail: a condition must never decide whether money is owed. "Balance due only if
+ * delivered within 30 days" would silently cancel ₦900,000 for one late day, a penalty-like term.
+ * So no Only-when on steps that create a priced obligation, or on workflows that contain them.
+ */
+export const MONEY_ACTIONS: ActionType[] = ["start_deliverable", "make_payment_due"];
+export const CONDITION_MONEY_RULE =
+  "Conditions can't decide whether money is owed. Payments and priced deliverables always happen when their workflow runs. To make money depend on something, use a different trigger (for example, when a deliverable is accepted).";
+export const conditionAllowedOnStep = (actionType: ActionType) => !MONEY_ACTIONS.includes(actionType);
+export const conditionAllowedOnWorkflow = (w: Pick<WorkflowView, "steps">) => w.steps.every((s) => conditionAllowedOnStep(s.actionType));
+
 export const CONDITIONS: Record<ConditionType, { label: string }> = {
   deliverable_accepted: { label: "A deliverable has been accepted" },
   delivered_before: { label: "A deliverable was delivered before a date" },
@@ -253,6 +271,8 @@ export function sendProblems(workflows: WorkflowView[], ctx: SentenceContext): s
   if (!items.some((c) => c.kind === "payment_obligation")) problems.push("Add a step that makes a payment due.");
   for (const w of workflows) {
     const name = triggerSentence(w, ctx);
+    if (w.onlyWhen && !conditionAllowedOnWorkflow(w)) problems.push(`Workflow ${q(name)} has a condition but includes money. ${CONDITION_MONEY_RULE}`);
+    if (w.steps.some((s) => s.onlyWhen && !conditionAllowedOnStep(s.actionType))) problems.push(`A money step in ${q(name)} has a condition. ${CONDITION_MONEY_RULE}`);
     if (w.steps.length === 0) problems.push(`Workflow ${q(name)} has no steps. Add a step or remove the workflow.`);
     const needs = TRIGGERS[w.triggerType].needs;
     if ((needs === "deliverable" || needs === "obligation" || needs === "payment") && !(w.triggerParams.commitmentId && ctx.commitments.has(w.triggerParams.commitmentId))) {

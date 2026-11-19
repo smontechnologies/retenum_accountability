@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ACTIONS, TRIGGERS, type ActionType, type Condition, type TriggerType } from "@/domain/workflow";
+import { ACTIONS, TRIGGERS, V1_TRIGGERS, type ActionType, type Condition, type TriggerType } from "@/domain/workflow";
 import { Field, SelectField, TextareaField } from "@/components/ui/form";
 import type { EditableStep, EditableTrigger, EditorOptions, Option } from "./types";
 
@@ -19,7 +19,7 @@ export function TriggerFields({ options, trigger, editableType = true }: { optio
         <div className="space-y-1.5">
           <label htmlFor="trigger-type" className="block text-small font-medium">When this happens</label>
           <select id="trigger-type" name="triggerType" value={type} onChange={(e) => setType(e.target.value as TriggerType)} className="w-full rounded-control border border-line-strong bg-raised px-3 py-2.5 text-body">
-            {(Object.keys(TRIGGERS) as TriggerType[]).map((t) => (
+            {(V1_TRIGGERS.includes(type) ? V1_TRIGGERS : [...V1_TRIGGERS, type]).map((t) => (
               <option key={t} value={t}>{TRIGGERS[t].label}</option>
             ))}
           </select>
