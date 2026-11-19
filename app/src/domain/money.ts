@@ -72,3 +72,20 @@ export function formatMoney(m: Money, locale = "en-NG"): string {
   const wholeStr = new Intl.NumberFormat(locale).format(whole);
   return `${negative ? "-" : ""}${symbol}${wholeStr}${exp > 0 ? "." + frac : ""}`;
 }
+
+const CURRENCY_WORDS: Record<Currency, [string, string]> = {
+  NGN: ["naira", "kobo"],
+  GBP: ["pounds", "pence"],
+  USD: ["dollars", "cents"],
+};
+
+/** Full spoken amount for screen readers (design system §9.6), e.g. "1,250,000 naira and 50 kobo". */
+export function spokenMoney(m: Money, locale = "en-NG"): string {
+  const exp = CURRENCY_EXPONENT[m.currency];
+  const negative = m.amountMinor < 0n;
+  const abs = negative ? -m.amountMinor : m.amountMinor;
+  const base = 10n ** BigInt(exp);
+  const [major, minor] = CURRENCY_WORDS[m.currency];
+  const text = `${new Intl.NumberFormat(locale).format(abs / base)} ${major} and ${(abs % base).toString()} ${minor}`;
+  return negative ? `minus ${text}` : text;
+}

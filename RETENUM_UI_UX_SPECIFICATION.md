@@ -145,7 +145,7 @@ Every table becomes a stacked list at < 768: one row becomes a block with its ma
 | S15 | Business | `/app/business` | Workspace profile, team, invitations, plan; payout setup (9) | 1A (moves `/app/w/[id]`) |
 | S16 | Create workspace | `/app/business/new` | First-run and additional workspaces | 1A |
 | S17 | Settings | `/app/settings` | Profile, Appearance (theme), Security | 1A |
-| S18 | Offline page | `/offline` | Shown by the service worker when a page isn't available offline | 1A |
+| S18 | Offline page | `/offline.html` (self-contained, no framework scripts) | Shown by the service worker when a page isn't available offline | 1A |
 | S19 | Close engagement / final account | `…/close` (drawer) | Final account proposal and response | 6 |
 | S20 | Admin | `/admin/*` | Internal operations | 7 |
 | S21 | Pay (checkout hand-off and return) | `…/payments/[obligation]/pay`, `/pay/return` | Provider checkout | 9 |
@@ -228,7 +228,7 @@ Commercial acts (confirm, decline, reject, authorise, accept, dispute, close, st
 |---|---|
 | Install | Manifest with name, short name, icons (192, 512, maskable 512, Apple 180), `display: standalone`, `start_url: /app`, theme and background colours per scheme. Installable on Android/Chrome desktop. iOS via "Add to Home Screen" (Apple touch icon, status-bar style) |
 | Splash | Generated from the manifest name, background colour and 512 icon (Android). Apple uses the touch icon |
-| Service worker caching | **Cache-first** for versioned static assets (`/_next/static/*`, fonts, icons). **Network-only** for pages, server actions, API routes and the auth endpoint. **Offline fallback** page for navigations that fail. Authenticated pages and financial data are **not** cached in the MVP (PWA-05) |
+| Service worker caching | **Cache-first** for versioned static assets (`/_next/static/*`, fonts, icons). **Network-only** for pages, server actions, API routes and the auth endpoint. **Offline fallback** page (`/offline.html`, self-contained) for navigations that fail. Authenticated pages and financial data are **not** cached in the MVP (PWA-05) |
 | Network status | `OfflineBanner`: "You're offline. You can read pages already open, but nothing can be confirmed, recorded or paid until you reconnect." Reconnecting shows "Back online" for 3 s, and the current page's data is refreshed |
 | Offline actions | All submit buttons are disabled with the reason shown. Nothing is queued or retried automatically, so a confirmation is never sent later without the user knowing (PWA-06, PWA-07). Next.js `experimental.useOffline` auto-retry is **not used** for this reason |
 | Updates | A new service worker waits. `UpdateBanner` offers "Reload to update". It activates only when the user agrees (no mid-form reloads) |

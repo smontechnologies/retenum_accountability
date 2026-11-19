@@ -16,28 +16,35 @@ import * as schema from "./schema";
 /** Driver-agnostic database type: both drivers extend PgDatabase. Transactions also satisfy it. */
 export type Database = PgDatabase<PgQueryResultHKT, typeof schema>;
 
-let instance: Database | undefined;
+/**
+ * One database client per server PROCESS. Next.js bundles route handlers, server actions and page
+ * rendering into separate module instances, so a module-level variable gave each its own client.
+ * With PGlite that meant several independent databases over one directory: writes invisible to other
+ * instances, sessions "invalid", corrupted files (found in e2e, 19 Nov 2026). With Postgres it would
+ * mean several connection pools. The instance therefore lives on globalThis.
+ */
+const globalForDb = globalThis as unknown as { __retenumDb?: Database };
 
 export function createPgliteDatabase(client: PGlite) {
   return drizzlePglite(client, { schema });
 }
 
 export function getDb(): Database {
-  if (instance) return instance;
+  if (globalForDb.__retenumDb) return globalForDb.__retenumDb;
   const e = env();
   if (e.DATABASE_URL) {
-    instance = drizzlePg(new Pool({ connectionString: e.DATABASE_URL, max: 5 }), { schema }) as unknown as Database;
+    globalForDb.__retenumDb = drizzlePg(new Pool({ connectionString: e.DATABASE_URL, max: 5 }), { schema }) as unknown as Database;
   } else {
     // PGlite does not create missing parent directories.
     mkdirSync(path.dirname(path.resolve(e.PGLITE_DIR)), { recursive: true });
-    instance = createPgliteDatabase(new PGlite(e.PGLITE_DIR)) as unknown as Database;
+    globalForDb.__retenumDb = createPgliteDatabase(new PGlite(e.PGLITE_DIR)) as unknown as Database;
   }
-  return instance;
+  return globalForDb.__retenumDb;
 }
 
 /** For tests only: inject a database. */
 export function setDbForTesting(db: Database | undefined): void {
-  instance = db;
+  globalForDb.__retenumDb = db;
 }
 
 export { schema };

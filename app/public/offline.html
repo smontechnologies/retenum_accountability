@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en" data-theme="system">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>You're offline · Retenum</title>
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0e0e0e">
+<!--
+  Self-contained offline page served by the service worker (PWA-02, UI/UX S18).
+  No framework scripts or external assets, so it always renders offline. Tokens mirror globals.css.
+-->
+<script>
+  (function () {
+    var m = document.cookie.match(/(?:^|; )rtn_theme=(light|dark|system)/);
+    if (m) document.documentElement.setAttribute("data-theme", m[1]);
+  })();
+</script>
+<style>
+  :root, [data-theme="light"] { --bg:#ffffff; --surface:#f5f5f5; --fg:#000000; --fg2:#3d3d3d; --line:#e2e2e2; color-scheme: light; }
+  [data-theme="dark"] { --bg:#0e0e0e; --surface:#171717; --fg:#ffffff; --fg2:#c8c8c8; --line:#2b2b2b; color-scheme: dark; }
+  @media (prefers-color-scheme: dark) { [data-theme="system"] { --bg:#0e0e0e; --surface:#171717; --fg:#ffffff; --fg2:#c8c8c8; --line:#2b2b2b; color-scheme: dark; } }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--fg); font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif; }
+  main { max-width: 28rem; min-height: 100dvh; margin: 0 auto; padding: 2.5rem 1rem; display: flex; flex-direction: column; justify-content: center; gap: 1.5rem; }
+  .mark { display: inline-flex; align-items: center; gap: .625rem; font-weight: 600; color: var(--fg); text-decoration: none; min-height: 2.75rem; }
+  .mark span:first-child { display: grid; place-items: center; width: 1.75rem; height: 1.75rem; border-radius: 6px; background: var(--fg); color: var(--bg); font-size: .9375rem; }
+  .panel { border: 1px solid var(--line); border-radius: 10px; padding: 1.5rem; }
+  h1 { font-size: 1.375rem; line-height: 1.75rem; font-weight: 600; margin: .75rem 0; }
+  p { font-size: .875rem; line-height: 1.25rem; color: var(--fg2); margin: .5rem 0 0; }
+  button { margin-top: 1.25rem; min-height: 2.75rem; padding: 0 1rem; border: 0; border-radius: 6px; background: var(--fg); color: var(--bg); font: inherit; font-size: .875rem; font-weight: 500; cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
+</style>
+</head>
+<body>
+<main id="main">
+  <a class="mark" href="/app"><span aria-hidden="true">R</span><span>Retenum</span></a>
+  <div class="panel">
+    <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h.01"/><path d="M8.5 16.43a5 5 0 0 1 7 0"/><path d="M2 8.82a15 15 0 0 1 4.17-2.65"/><path d="M10.66 5c4.01-.36 8.14.9 11.34 3.76"/><path d="M16.85 11.25a10 10 0 0 1 2.22 1.68"/><path d="M5 12.86a10 10 0 0 1 5.17-2.69"/><path d="m2 2 20 20"/></svg>
+    <h1>You're offline</h1>
+    <p>This page isn't available without a connection. Retenum doesn't keep copies of your engagements or balances on this device, so you always see the current record when you're back online.</p>
+    <p>Nothing can be confirmed, recorded or paid while you're offline.</p>
+    <button type="button" onclick="location.reload()">Try again</button>
+  </div>
+</main>
+</body>
+</html>

@@ -13,7 +13,7 @@ dependency) and pnpm 10.
 pnpm install
 cp .env.example .env.local        # set BETTER_AUTH_SECRET (openssl rand -base64 32)
 pnpm db:migrate                   # creates the local embedded database in ../.data/pglite (outside app/ on purpose)
-pnpm dev                          # http://localhost:3000  (health: /api/health)
+pnpm dev                          # http://localhost:3000  (health: /api/health; components: /dev/components)
 ```
 
 No Docker or Postgres install is needed locally: development and tests use PGlite (real Postgres in
@@ -24,7 +24,8 @@ WebAssembly). Production requires `DATABASE_URL` (managed Postgres) and refuses 
 ```bash
 pnpm typecheck
 pnpm test        # unit + integration tests against fresh in-memory Postgres with real migrations
-pnpm build
+pnpm build       # webpack (much faster than Turbopack on this machine)
+pnpm test:e2e    # builds and starts a local production server, then runs Playwright in installed Chrome
 ```
 
 ## Rules that the code enforces

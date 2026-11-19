@@ -74,12 +74,13 @@
 | R-O03 | Hosting outside Nigeria causes latency or data-transfer problems | 3 | 2 | 6 | Lightweight pages. Legal review of transfers (O-03) | E/Lg |
 | R-O04 | Email deliverability to Nigerian corporate domains | 3 | 3 | 9 | Authenticated domain (SPF/DKIM/DMARC). The in-app "awaiting response" list doesn't rely on email | E |
 | R-O05 | Scope creep delays design-partner release | 3 | 3 | 9 | MoSCoW discipline. W list in PRD §13 | F/E |
-| R-O06 | Dev environment diverges from production (webpack dev vs Turbopack build; Node 22.11 locally; Chrome-driven e2e) and hides bugs | 3 | 2 | 6 | Upgrade local Node to ≥22.12; run e2e against a production build in Slice 8; CI on Linux | E |
+| R-O06 | Dev environment diverges from production and hides bugs | 2 | 2 | 4 | **Mitigated 19 Nov:** webpack for dev and build; e2e runs against a production build. Remaining: Node 22.11 locally (upgrade to ≥22.12), PGlite locally vs Postgres in production (run integration suite against a Neon branch in Slice 8) | E |
 
 ## Change log
 
 | Date | Change |
 |---|---|
 | 2026-11-18 | Created |
+| 2026-11-19 | R-O06 mitigated (webpack build, production-build e2e) and rescored |
 | 2026-11-18 | Payment provider switched to Bachs: R-L01 and R-PAY03 rewritten; R-PAY07 (provider assurance, score 15) added |
 | 2026-11-18 | Added R-O06 (dev toolchain divergence). Updated R-S02 note: Better Auth rate-limit storage is in-memory until moved to DB |

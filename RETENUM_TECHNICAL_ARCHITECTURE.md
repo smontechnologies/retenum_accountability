@@ -48,7 +48,7 @@ retenum/                         (repository root = app/)
       (auth)/  app/  api/webhooks/[provider]/  api/cron/[job]/  api/health/  manifest.ts  offline/
     components/
       ui/                        design-system components (Button, Field, StatusBadge, MoneyFigure, LedgerStrip, …)
-      shell/                     Sidebar, BottomNav, TopBar, OfflineBanner, UpdateBanner
+      shell/                     SideNav, BottomNav, Wordmark, WorkspaceSwitcher, OfflineBanner, ServiceWorkerManager, ThemeSync
     domain/                      PURE logic: no DB, no framework
       money.ts  engagement-state.ts  change-state.ts  delivery-state.ts
       payment-state.ts  financials.ts  working-days.ts  hash-chain.ts
@@ -206,7 +206,7 @@ The trigger rejects UPDATE and DELETE. A verification function recomputes the ch
 
 | Env | App | DB | Payments | Email | Files |
 |---|---|---|---|---|---|
-| local | `next dev --webpack` | PGlite file in `../.data/` | fake provider; Bachs **sandbox** keys from the last slice | console / file | local disk |
+| local | `next dev --webpack` (build: `next build --webpack`) | PGlite file in `../.data/` | fake provider; Bachs **sandbox** keys from the last slice | console / file | local disk |
 | test (CI) | Vitest | PGlite in-memory, migrations applied | fake provider for unit tests; real Bachs sandbox tests run **only** when `BACHS_SANDBOX_SECRET_KEY` is set (reported as skipped otherwise) | in-memory | in-memory |
 | staging | Vercel preview | Neon branch | Bachs sandbox | Resend (test domain) | R2 staging bucket |
 | production | Vercel production | Neon main | test until G-PAY, then live | Resend | R2 prod bucket |
@@ -256,6 +256,7 @@ Rules:
 | Date | Change |
 |---|---|
 | 2026-11-18 | Created |
+| 2026-11-19 | Slice 1A findings: **production build uses webpack** (Turbopack 17.7 min vs webpack 39.5 s here); **`getDb()`/`getAuth()` are process-wide singletons on `globalThis`** (Next.js creates several module instances; per-module clients caused split PGlite databases and would create multiple Postgres pools); cookie `Secure` follows APP_URL protocol; offline fallback is a self-contained `public/offline.html`; **e2e runs against a local production build** with `E2E_LOCAL_PRODUCTION=1` (localhost only) |
 | 2026-11-18 | Added TD-21…TD-26 (design tokens, themes, font, icons, PWA, no auto-retry offline, axe) for the visual design, UI/UX and PWA requirements |
 | 2026-11-18 | Payment provider switched from Paystack to Bachs (direct charges on Connect sub accounts); provider integration moved to the last slice (D-50) |
 | 2026-11-18 | Slice 1 findings: `next dev` runs with `--webpack` (Turbopack dev reload loop on macOS 13/Node 22.11); local data lives in `../.data` outside `app/`; e2e uses Playwright driving installed Chrome (bundled Chromium unsupported on macOS 13); dev/e2e email adapter writes JSON lines to a file and is refused in production; Tailwind pinned to 4.2.4 until Node ≥ 22.12 |

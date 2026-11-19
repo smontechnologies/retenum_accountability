@@ -19,7 +19,18 @@ const nextConfig: NextConfig = {
   // PGlite ships WASM and must not be bundled by the server compiler.
   serverExternalPackages: ["@electric-sql/pglite"],
   async headers() {
-    return [{ source: "/:path*", headers: securityHeaders }];
+    return [
+      { source: "/:path*", headers: securityHeaders },
+      {
+        // The service worker must always be revalidated so updates are found (PWA-04).
+        source: "/sw.js",
+        headers: [
+          { key: "Content-Type", value: "application/javascript; charset=utf-8" },
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+          { key: "Content-Security-Policy", value: "default-src 'self'; script-src 'self'" },
+        ],
+      },
+    ];
   },
 };
 

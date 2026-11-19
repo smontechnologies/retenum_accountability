@@ -1,11 +1,14 @@
 "use server";
 
+import { secureCookies } from "@/server/lib/env";
+import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getDb } from "@/server/db/client";
 import { requireActor } from "@/server/auth/session";
 import { errorToFormState, type FormState } from "@/server/lib/form-state";
 import { kickOutbox } from "@/server/outbox/kick";
+import { WORKSPACE_COOKIE } from "@/server/modules/workspaces/current";
 import {
   acceptInvitation,
   changeMemberRole,
@@ -17,6 +20,10 @@ import {
 } from "@/server/modules/workspaces/service";
 
 const str = (d: FormData, k: string) => String(d.get(k) ?? "");
+
+async function selectWorkspace(id: string) {
+  (await cookies()).set(WORKSPACE_COOKIE, id, { path: "/", sameSite: "lax", httpOnly: true, secure: secureCookies(), maxAge: 60 * 60 * 24 * 400 });
+}
 
 export async function createWorkspaceAction(_: FormState, data: FormData): Promise<FormState> {
   const actor = await requireActor();
@@ -32,7 +39,8 @@ export async function createWorkspaceAction(_: FormState, data: FormData): Promi
   } catch (err) {
     return errorToFormState(err);
   }
-  redirect(`/app/w/${id}`);
+  await selectWorkspace(id);
+  redirect("/app/business?created=1");
 }
 
 export async function inviteMemberAction(_: FormState, data: FormData): Promise<FormState> {
@@ -44,11 +52,19 @@ export async function inviteMemberAction(_: FormState, data: FormData): Promise<
     return errorToFormState(err);
   }
   kickOutbox();
-  revalidatePath(`/app/w/${workspaceId}`);
+  revalidatePath("/app/business");
   return { status: "success", message: "Invitation sent. It expires in 7 days." };
 }
 
-/** Small mutations used by per-row forms. */
+const DONE: Record<string, string> = {
+  "make-admin": "Role changed to admin.",
+  "make-member": "Role changed to member.",
+  remove: "Member removed.",
+  transfer: "Ownership transferred.",
+  revoke: "Invitation withdrawn.",
+};
+
+/** Per-row team mutations (each behind a confirmation dialog in the UI). */
 export async function memberAction(_: FormState, data: FormData): Promise<FormState> {
   const actor = await requireActor();
   const workspaceId = str(data, "workspaceId");
@@ -69,9 +85,12 @@ export async function memberAction(_: FormState, data: FormData): Promise<FormSt
   } catch (err) {
     return errorToFormState(err);
   }
-  if (op === "remove" && target === actor.userId) redirect("/app");
-  revalidatePath(`/app/w/${workspaceId}`);
-  return { status: "success", message: "Done." };
+  if (op === "remove" && target === actor.userId) {
+    (await cookies()).delete(WORKSPACE_COOKIE);
+    redirect("/app");
+  }
+  revalidatePath("/app/business");
+  return { status: "success", message: DONE[op] };
 }
 
 export async function acceptInvitationAction(_: FormState, data: FormData): Promise<FormState> {
@@ -83,5 +102,6 @@ export async function acceptInvitationAction(_: FormState, data: FormData): Prom
   } catch (err) {
     return errorToFormState(err);
   }
-  redirect(`/app/w/${workspaceId}`);
+  await selectWorkspace(workspaceId);
+  redirect("/app/business");
 }

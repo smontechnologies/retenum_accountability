@@ -56,8 +56,9 @@ export function createAuth(db: Database, options: { secret?: string; baseURL?: s
 
 export type Auth = ReturnType<typeof createAuth>;
 
-let instance: Auth | undefined;
+/** One auth instance per process (same reason as getDb: Next.js creates several module instances). */
+const globalForAuth = globalThis as unknown as { __retenumAuth?: Auth };
 export function getAuth(): Auth {
-  if (!instance) instance = createAuth(getDb(), { nextJs: true });
-  return instance;
+  if (!globalForAuth.__retenumAuth) globalForAuth.__retenumAuth = createAuth(getDb(), { nextJs: true });
+  return globalForAuth.__retenumAuth;
 }

@@ -40,6 +40,32 @@ describe("production email configuration", () => {
   });
 });
 
+describe("local production e2e exception", () => {
+  const saved3 = { ...process.env };
+  afterEach(() => {
+    process.env = { ...saved3 };
+    resetEnvCache();
+  });
+  const prod = (appUrl: string) => {
+    (process.env as Record<string, string>).NODE_ENV = "production";
+    process.env.BETTER_AUTH_SECRET = "x".repeat(40);
+    delete process.env.DATABASE_URL;
+    process.env.EMAIL_MODE = "file";
+    process.env.E2E_LOCAL_PRODUCTION = "1";
+    process.env.APP_URL = appUrl;
+    resetEnvCache();
+  };
+  it("allows the embedded database and file email only for localhost", () => {
+    prod("http://localhost:3200");
+    expect(env().E2E_LOCAL_PRODUCTION).toBe("1");
+  });
+  it("is refused for any real host, and the normal production rules apply", () => {
+    prod("https://app.retenum.com");
+    expect(() => env()).toThrow(/E2E_LOCAL_PRODUCTION: Only allowed when APP_URL is localhost/);
+    expect(() => env()).toThrow(/DATABASE_URL/);
+  });
+});
+
 describe("ids and tokens (SEC-06)", () => {
   it("secret tokens have >=32 bytes of entropy and only the hash is derived", () => {
     const { token, hash } = newSecretToken();

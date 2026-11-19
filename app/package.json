@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "next dev --webpack",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -21,6 +21,7 @@
     "@electric-sql/pglite": "0.5.16",
     "better-auth": "1.7.25",
     "drizzle-orm": "0.45.4",
+    "lucide-react": "1.75.0",
     "next": "16.4.6",
     "pg": "8.23.1",
     "react": "19.3.1",
@@ -28,6 +29,7 @@
     "zod": "4.6.7"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
     "@playwright/test": "1.65.1",
     "@rolldown/binding-darwin-x64": "1.2.19",
     "@tailwindcss/postcss": "4.2.4",

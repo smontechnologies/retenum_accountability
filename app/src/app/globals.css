@@ -1,25 +1,168 @@
 @import "tailwindcss";
 
-/* Plain, high-contrast base (black and white for now; branding is out of scope). */
-:root {
+/*
+ * Retenum design tokens (RETENUM_DESIGN_SYSTEM.md §2–§4). Components use ONLY these tokens.
+ * Tailwind's default colour palette is removed so that no hue can be used by accident (DES-01/04).
+ */
+
+/* Light (default) */
+:root,
+[data-theme="light"] {
   --bg: #ffffff;
-  --fg: #111111;
-  --muted: #555555;
-  --border: #d4d4d4;
+  --surface: #f5f5f5;
+  --surface-raised: #ffffff;
+  --surface-sunken: #ededed;
+  --fg: #000000;
+  --fg-secondary: #3d3d3d;
+  --fg-muted: #666666;
+  --line: #e2e2e2;
+  --line-strong: #858585;
+  --action: #000000;
+  --action-fg: #ffffff;
+  --action-hover: #262626;
+  --focus: #000000;
+  --overlay: rgb(0 0 0 / 0.45);
+  --shadow-overlay: 0 8px 24px rgb(0 0 0 / 0.12);
+  color-scheme: light;
 }
+
+/* Dark: explicit choice */
+[data-theme="dark"] {
+  --bg: #0e0e0e;
+  --surface: #171717;
+  --surface-raised: #1e1e1e;
+  --surface-sunken: #0a0a0a;
+  --fg: #ffffff;
+  --fg-secondary: #c8c8c8;
+  --fg-muted: #9c9c9c;
+  --line: #2b2b2b;
+  --line-strong: #737373;
+  --action: #ffffff;
+  --action-fg: #000000;
+  --action-hover: #e0e0e0;
+  --focus: #ffffff;
+  --overlay: rgb(0 0 0 / 0.7);
+  --shadow-overlay: none;
+  color-scheme: dark;
+}
+
+/* Dark: following the system */
 @media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0f0f0f;
-    --fg: #f2f2f2;
-    --muted: #a3a3a3;
-    --border: #3a3a3a;
+  [data-theme="system"] {
+    --bg: #0e0e0e;
+    --surface: #171717;
+    --surface-raised: #1e1e1e;
+    --surface-sunken: #0a0a0a;
+    --fg: #ffffff;
+    --fg-secondary: #c8c8c8;
+    --fg-muted: #9c9c9c;
+    --line: #2b2b2b;
+    --line-strong: #737373;
+    --action: #ffffff;
+    --action-fg: #000000;
+    --action-hover: #e0e0e0;
+    --focus: #ffffff;
+    --overlay: rgb(0 0 0 / 0.7);
+    --shadow-overlay: none;
+    color-scheme: dark;
   }
 }
-html, body {
-  background: var(--bg);
-  color: var(--fg);
+
+/* `dark:` utilities follow the resolved theme (explicit dark, or system + OS dark). */
+@custom-variant dark {
+  &:where([data-theme="dark"], [data-theme="dark"] *) {
+    @slot;
+  }
+  @media (prefers-color-scheme: dark) {
+    &:where([data-theme="system"], [data-theme="system"] *) {
+      @slot;
+    }
+  }
 }
-:focus-visible {
-  outline: 2px solid currentColor;
-  outline-offset: 2px;
+
+@theme {
+  --color-*: initial;
+  --breakpoint-sm: 25rem;   /* 400 */
+  --breakpoint-md: 48rem;   /* 768 */
+  --breakpoint-lg: 64rem;   /* 1024 */
+  --breakpoint-xl: 80rem;   /* 1280 */
+  --breakpoint-2xl: 96rem;  /* 1536 */
+
+  --radius-badge: 4px;
+  --radius-control: 6px;
+  --radius-panel: 10px;
+  --radius-overlay: 14px;
+
+  --text-figure-xl: 2rem;
+  --text-figure-xl--line-height: 2.25rem;
+  --text-display: 1.75rem;
+  --text-display--line-height: 2.125rem;
+  --text-h2: 1.375rem;
+  --text-h2--line-height: 1.75rem;
+  --text-h3: 1.125rem;
+  --text-h3--line-height: 1.5rem;
+  --text-body: 1rem;
+  --text-body--line-height: 1.5rem;
+  --text-small: 0.875rem;
+  --text-small--line-height: 1.25rem;
+  --text-caption: 0.8125rem;
+  --text-caption--line-height: 1.125rem;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-raised: var(--surface-raised);
+  --color-sunken: var(--surface-sunken);
+  --color-fg: var(--fg);
+  --color-fg-secondary: var(--fg-secondary);
+  --color-fg-muted: var(--fg-muted);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-action: var(--action);
+  --color-action-fg: var(--action-fg);
+  --color-action-hover: var(--action-hover);
+  --color-focus: var(--focus);
+  --color-overlay: var(--overlay);
+  --font-sans: var(--font-plex), ui-sans-serif, system-ui, sans-serif;
+  --shadow-overlay: var(--shadow-overlay);
+}
+
+@layer base {
+  html {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-sans);
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-size: var(--text-body);
+    line-height: var(--text-body--line-height);
+  }
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: var(--fg);
+    color: var(--bg);
+  }
+  dialog::backdrop {
+    background: var(--overlay);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      transition-duration: 0ms !important;
+      animation-duration: 0ms !important;
+    }
+  }
+}
+
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
 }

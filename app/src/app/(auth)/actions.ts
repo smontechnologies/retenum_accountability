@@ -1,6 +1,9 @@
 "use server";
 
-import { headers } from "next/headers";
+import { secureCookies } from "@/server/lib/env";
+import { cookies, headers } from "next/headers";
+import { getDb } from "@/server/db/client";
+import { getUserTheme, THEME_COOKIE, THEME_COOKIE_MAX_AGE } from "@/server/modules/preferences/theme";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getAuth } from "@/server/auth/auth";
@@ -32,8 +35,9 @@ export async function signUpAction(_: FormState, data: FormData): Promise<FormSt
 export async function signInAction(_: FormState, data: FormData): Promise<FormState> {
   const parsed = z.object({ email: Email, password: z.string().min(1, "Required") }).safeParse(Object.fromEntries(data));
   if (!parsed.success) return fieldErrors(parsed.error);
+  let userId: string;
   try {
-    await getAuth().api.signInEmail({ body: parsed.data, headers: await headers() });
+    ({ user: { id: userId } } = await getAuth().api.signInEmail({ body: parsed.data, headers: await headers() }));
   } catch (err) {
     const state = errorToFormState(err);
     if (state.fields?._code === "EMAIL_NOT_VERIFIED") {
@@ -43,6 +47,9 @@ export async function signInAction(_: FormState, data: FormData): Promise<FormSt
     // Same message for unknown email and wrong password (no account enumeration).
     return { status: "error", message: "Email or password is incorrect." };
   }
+  // DES-03: apply the theme saved on the account to this device.
+  const theme = await getUserTheme(getDb(), userId);
+  (await cookies()).set(THEME_COOKIE, theme, { path: "/", sameSite: "lax", maxAge: THEME_COOKIE_MAX_AGE, secure: secureCookies() });
   redirect(safeNext(data.get("next")));
 }
 

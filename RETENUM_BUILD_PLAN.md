@@ -25,8 +25,8 @@ A UI slice is only done when the design system §11 checklist passes: tokens and
 |---|---|---|---|
 | 0 | Foundation | ✅ Done (see log) | 3 d |
 | 1 | Identity and workspaces | ✅ Done (see log) | 3 d |
-| 1A | **Design system, app shell, themes and PWA** (and Slice 1 screens brought up to the design system) | ⏳ Next | 4 d |
-| 2 | Engagement draft, counterparty invitation, baseline confirmation | Not started | 5 d |
+| 1A | **Design system, app shell, themes and PWA** (and Slice 1 screens brought up to the design system) | ✅ Done (see log) | 4 d |
+| 2 | Engagement draft, counterparty invitation, baseline confirmation | ⏳ Next | 5 d |
 | 3 | Changes: agreement, authorisation, valuation, versions | Not started | 5 d |
 | 4 | Delivery, evidence and acceptance; party obligations | Not started | 4 d |
 | 5 | Financial record, payment requests, off-platform payments, provider abstraction, amount disputes | Not started | 5 d |
@@ -341,3 +341,62 @@ A UI slice is only done when the design system §11 checklist passes: tokens and
 - No ESLint yet. TOTP 2FA (FR-ID-08, S) and multi-workspace switcher polish (FR-WS-05, S) not built.
 - Better Auth's built-in rate limiting is enabled only in production and uses in-memory storage — must switch to database storage before running more than one server instance (R-S02).
 - CI has still never run (no remote).
+
+### Slice 1A — Design system, app shell, themes and PWA: ✅ complete (19 Nov 2026)
+
+**Built**
+- Design documents: `RETENUM_DESIGN_SYSTEM.md` (contrast ratios computed, not estimated) and `RETENUM_UI_UX_SPECIFICATION.md`.
+- Monochrome tokens for light, dark and system in `globals.css`. **Tailwind's default palette is removed**, so no hue can be used by accident (DES-01/04). IBM Plex Sans self-hosted. Tabular figures for money.
+- Component library in `src/components/ui/`:
+  - Button and ButtonLink;
+  - Form, Field, Textarea, Select and Checkbox;
+  - Alert, StatusBadge (status grammar for all 29 states), MoneyFigure (with a spoken amount for screen readers), LedgerStrip and PaymentSummary;
+  - Panel, Card, PageHeader, DescriptionList (container-aware), ResponsiveTable (table → stacked list);
+  - Tabs, Timeline;
+  - Dialog, ConfirmAction and Drawer (native `<dialog>`);
+  - Toast, Empty/Error/Loading states, ThemeSelect.
+- App shell: sidebar (≥ 1024), icon rail (768–1023), top bar plus bottom navigation with a More sheet (< 768), workspace switcher.
+- Screens:
+  - Overview and the Engagements, Payments and Activity pages with honest empty states;
+  - Business (moved from `/app/w/[id]`, which now redirects);
+  - Create workspace;
+  - Settings with Profile, Appearance and Security;
+  - restyled sign-in screens and invitation page;
+  - a development-only component catalogue (`/dev/components`).
+- Theme: a server-rendered cookie (no flash), the `user_preferences` table, applied at sign-in and synced on app pages (cross-device).
+- PWA: manifest; generated icons (192, 512, maskable, Apple, favicon); a hand-written service worker (cache-first only for versioned static assets and icons, never pages or financial data, never non-GET requests, self-contained `/offline.html` fallback); offline and back-online banner; forms blocked offline with nothing queued; an update prompt that only reloads when the user agrees.
+
+**Requirements satisfied:** DES-01…12, PWA-01…08, NFR-01/02 for all current screens; design system quality gate (§11).
+
+**Tests actually run (final run)**
+- `pnpm test`: **10 files, 98 tests passed**. New: status grammar completeness (icons exist, sentence case, distinct labels), escalation of "needs you", spoken money, theme preference service, production email guard, localhost-only production test exception.
+- `pnpm test:e2e` against a **local production build**, in Chrome: **18 passed, 6 skipped by design** (the matrices run once, on desktop). Covers:
+  - axe WCAG 2.2 AA with **zero violations in light and dark** on every public and app page;
+  - no horizontal overflow at 320/390/768/1024/1280/1536 on every page, with the correct navigation pattern per size;
+  - theme persistence across reload and on a second device;
+  - manifest and real PNG icon sizes;
+  - service worker served uncached, registers and controls the page, offline navigation shows the offline page;
+  - offline banner, submit blocked, back-online recovery;
+  - all Slice 1 journeys on mobile and desktop;
+  - **with JavaScript disabled, forms post to the server and never put values (passwords) in the URL**.
+- `pnpm typecheck` passed. `pnpm build` passed. `pnpm audit --audit-level high` passed (one moderate, dev-only drizzle-kit/esbuild).
+- Visual review: screenshots of Overview, Business and Settings in light and dark at 390 and 1280, plus home and sign-in at 390, inspected.
+
+**Bugs found and fixed during verification**
+1. **Security:** a wrapped server action broke progressive enhancement. A form submitted before hydration would do a native GET, putting the password in the URL. The server action is now passed to React directly. Regression test added (JavaScript disabled).
+2. The service worker update handler reloaded the page on **first** install (`controllerchange`), interrupting users mid-action. It now reloads only when a new worker replaces an existing one at the user's request.
+3. **The database was instantiated once per Next.js module instance.** With PGlite that meant several databases over one directory: theme saves invisible to page renders, sessions judged invalid (users signed out), corrupted files. `getDb()` and `getAuth()` are now process-wide singletons on `globalThis`. In production this also prevents multiple Postgres pools.
+4. Cookie `Secure` flag was tied to `NODE_ENV`. It now follows the app's protocol (https → Secure), which is correct for deployments and works for local http.
+5. The offline page was a Next.js page whose scripts weren't cached, so it crashed offline. It's now a self-contained `/offline.html`.
+6. The wordmark link's accessible name didn't contain its visible text (WCAG 2.5.3).
+7. Visual review: native selects matched `:read-only` and looked disabled; label/value lists broke long values mid-word in narrow panels (now container queries); side-by-side panels stretched to equal height; empty "Actions" rows on mobile.
+8. A layout-wide `revalidatePath` in the theme action was removed (unnecessary; it re-rendered the shell inside the action).
+
+**Changes to tooling (recorded in the architecture doc)**
+- **Production builds use webpack** (`next build --webpack`): 39.5 s vs 17.7 min with Turbopack on this machine, and it matches dev.
+- **Browser tests run against a local production build** (`next build && next start`). That's required for reliable PWA and offline testing, and removed dev-mode compile delays (suite time went from 1.2 h to about 2.5 min). `E2E_LOCAL_PRODUCTION=1` allows the embedded database and file email **only when APP_URL is localhost** (unit-tested).
+
+**Known gaps**
+- No automated test yet for the update prompt (requires deploying two service-worker versions). Behaviour reviewed in code.
+- iOS install behaviour was not tested on a device (Playwright drives Chrome only).
+- Lighthouse PWA audit not run.

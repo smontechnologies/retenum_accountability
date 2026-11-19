@@ -194,7 +194,7 @@ Every commercial state is a **badge = icon + label + style**. Style encodes *who
 | Valuation agreed | `valuation_agreed` | scale + check | Settled |
 | Submitted for acceptance | `submitted` | send | Waiting (Needs you for the payer) |
 | Accepted | `accepted` | check-check | Settled |
-| Partially accepted | `partially_accepted` | circle-half | Waiting |
+| Partially accepted | `partially_accepted` | circle-dashed | Waiting |
 | Correction requested | `correction_requested` | rotate-ccw | Waiting (Needs you for the payee) |
 | Disputed | `disputed` | flag | Contested |
 | Scheduled (payment) | `scheduled` | calendar | Neutral |
