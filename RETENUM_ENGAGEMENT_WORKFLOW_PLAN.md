@@ -185,3 +185,16 @@ New engagements start from a **template** (e.g. "Agency: deposit, concepts, laun
 6. **Templates:** which 2–3 templates first? *Proposal: "Agency project (deposit, milestones, balance)", "Retainer (monthly)", "Simple fixed price (pay on completion)".*
 7. **Run history replaces the Activity tab?** *Recommendation: yes. Activity becomes the run history plus other records (confirmations, disputes).*
 8. **Re-sequenced build plan (§7):** approve W1 → W2 → workflow changes → delivery → payments?
+
+---
+
+## 10. Agreed decisions (19 Nov 2026)
+
+| # | Decision | Agreed |
+|---|---|---|
+| 1 | The workflow editor **is the main view** of every engagement, replacing the Overview / Agreement / Changes / Delivery / Payments tabs. The ledger header (Agreed · Paid · Outstanding) stays on top. Activity becomes the **run history** | ✅ Yes |
+| 2 | **Three panes on desktop** (workflow list · vertical canvas · step editor docked right). Mobile: list → canvas → bottom-sheet editor | ✅ Yes |
+| 4 | **The initiator builds** the draft workflows. The counterparty reviews and can ask for changes with comments. After confirmation, either side proposes step changes, which the other confirms | ✅ Yes |
+| 5 | **Helper workflows (Notify, Remind) in version 1** of the engine. Visible to both, never create obligations | ✅ Yes |
+
+Still to align: **3** (vocabulary), **6** (first templates), **8** (re-sequenced build plan).
