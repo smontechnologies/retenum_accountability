@@ -130,9 +130,13 @@ The canvas turns from **design** into **live** mode. Each step shows **Done ✓ 
 
 Every run is listed: *"14 Feb 10:02 — Launch assets accepted by Ngozi → Step 1 Balance ₦900,000 became due ✓ · Step 2 Notified Ada Studio ✓ · Step 3 skipped (condition: delivered before 31 Jan was false)."*
 
-### Templates
+### Building from a blank start (no templates)
 
-New engagements start from a **template** (e.g. "Agency: deposit, concepts, launch, balance") that pre-builds the workflows, so nobody starts from a blank canvas (FR-ENG-12).
+Founder decision (§10.6): **there are no templates.** The initiator builds their own agreement the way a Bubble user builds an app. They click **+**, choose which element of the engagement goes there (a deliverable, a payment, an approval, a reminder…), and place it where they want it. The experience should make them feel like **both the engineer and the lawyer of their own agreement**: simple visual building blocks that compose a precise commercial agreement.
+
+- A new engagement opens with one workflow, **"When the agreement is confirmed"**, and an empty **+** under it, plus **+ New workflow** in the list.
+- An empty canvas is fine while drafting. It still **can't be sent** until it has at least one priced deliverable and a payment (FR-ENG-12), and the editor lists what's missing.
+- **"Read as agreement" (proposed, to confirm):** a toggle that renders the workflows as numbered plain-language clauses, e.g. *"3. When Kola Foods accepts the Launch assets, a payment of ₦900,000 (Balance) becomes due, payable within 7 days."* That's what the counterparty reviews and confirms, so the visual build and the agreement text always say the same thing.
 
 ---
 
@@ -197,4 +201,8 @@ New engagements start from a **template** (e.g. "Agency: deposit, concepts, laun
 | 4 | **The initiator builds** the draft workflows. The counterparty reviews and can ask for changes with comments. After confirmation, either side proposes step changes, which the other confirms | ✅ Yes |
 | 5 | **Helper workflows (Notify, Remind) in version 1** of the engine. Visible to both, never create obligations | ✅ Yes |
 
-Still to align: **3** (vocabulary), **6** (first templates), **8** (re-sequenced build plan).
+| 3 | **Version 1 vocabulary** as in §3: all listed triggers and steps | ✅ Yes |
+| 6 | **No templates.** Users build from a blank start with + and the element menu ("feel like the engineer and lawyer of their own agreement") | ✅ Founder decision |
+| 8 | **Build order:** W1 (workflow model + three-pane editor + confirming workflows as the agreement) → W2 (server engine, live canvas, run history) → workflow changes → delivery → payments → closure, notifications, production readiness, Bachs | ✅ Approved |
+
+**Open (proposed):** the "Read as agreement" clause view (§5) as part of W1.
