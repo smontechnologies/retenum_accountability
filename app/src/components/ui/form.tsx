@@ -171,7 +171,7 @@ function FieldShell({ id, label, hint, error, children, name }: { id: string; la
 
 const controlClasses = (invalid: boolean) =>
   cn(
-    "w-full rounded-control bg-raised px-3 py-2.5 text-body text-fg placeholder:text-fg-muted",
+    "w-full rounded-control bg-raised px-3 py-2.5 text-body pointer-fine:py-1.5 text-fg placeholder:text-fg-muted",
     "disabled:bg-sunken disabled:text-fg-muted",
     invalid ? "border-2 border-fg" : "border border-line-strong",
   );

@@ -18,12 +18,12 @@ function SideLink({ item, compact }: { item: NavItem; compact?: boolean }) {
       aria-current={active ? "page" : undefined}
       title={compact ? item.label : undefined}
       className={cn(
-        "flex min-h-11 items-center gap-3 rounded-control px-3 text-small transition-colors duration-[120ms]",
-        compact && "justify-center px-0",
-        active ? "bg-raised font-semibold text-fg ring-1 ring-line" : "text-fg-secondary hover:bg-raised hover:text-fg",
+        "flex min-h-8 items-center gap-2.5 rounded-control px-2 text-small transition-colors duration-[120ms]",
+        compact && "min-h-10 justify-center px-0",
+        active ? "bg-sunken font-medium text-fg" : "text-fg-secondary hover:bg-sunken/60 hover:text-fg",
       )}
     >
-      <Icon aria-hidden className="size-5 shrink-0" strokeWidth={active ? 2 : 1.5} />
+      <Icon aria-hidden className={cn("shrink-0", compact ? "size-5" : "size-4")} strokeWidth={active ? 2 : 1.75} />
       <span className={compact ? "sr-only" : ""}>{item.label}</span>
     </Link>
   );
@@ -32,16 +32,16 @@ function SideLink({ item, compact }: { item: NavItem; compact?: boolean }) {
 /** Desktop sidebar (≥ lg) and tablet icon rail (md) — UI/UX §2. */
 export function SideNav({ compact = false, header, footer }: { compact?: boolean; header?: React.ReactNode; footer?: React.ReactNode }) {
   return (
-    <nav aria-label="Main" className="flex h-full flex-col gap-6">
+    <nav aria-label="Main" className="flex h-full flex-col gap-4">
       {header}
-      <ul className="space-y-1">
+      <ul className="space-y-px">
         {PRIMARY_NAV.map((i) => (
           <li key={i.href}>
             <SideLink item={i} compact={compact} />
           </li>
         ))}
       </ul>
-      <ul className="space-y-1 border-t border-line pt-4">
+      <ul className="space-y-px border-t border-line pt-3">
         {SECONDARY_NAV.map((i) => (
           <li key={i.href}>
             <SideLink item={i} compact={compact} />

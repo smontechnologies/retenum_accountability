@@ -11,7 +11,7 @@ export function buttonClasses(variant: ButtonVariant = "primary", size: ButtonSi
   return cn(
     "inline-flex items-center justify-center gap-2 rounded-control font-medium transition-colors duration-[120ms]",
     "disabled:cursor-not-allowed disabled:opacity-40 aria-disabled:cursor-not-allowed aria-disabled:opacity-40",
-    size === "md" ? "min-h-11 px-4 text-small" : "min-h-9 px-3 text-small",
+    size === "md" ? "min-h-11 px-4 text-small pointer-fine:min-h-8 pointer-fine:px-3" : "min-h-9 px-3 text-small pointer-fine:min-h-7 pointer-fine:px-2.5",
     block && "w-full",
     variant === "primary" && "bg-action text-action-fg hover:bg-action-hover",
     variant === "secondary" && "border border-line-strong bg-transparent text-fg hover:bg-surface",

@@ -18,7 +18,7 @@ export function TriggerFields({ options, trigger, editableType = true }: { optio
       {editableType ? (
         <div className="space-y-1.5">
           <label htmlFor="trigger-type" className="block text-small font-medium">When this happens</label>
-          <select id="trigger-type" name="triggerType" value={type} onChange={(e) => setType(e.target.value as TriggerType)} className="w-full rounded-control border border-line-strong bg-raised px-3 py-2.5 text-body">
+          <select id="trigger-type" name="triggerType" value={type} onChange={(e) => setType(e.target.value as TriggerType)} className="w-full rounded-control border border-line-strong bg-raised px-3 py-2.5 text-body pointer-fine:py-1.5">
             {(V1_TRIGGERS.includes(type) ? V1_TRIGGERS : [...V1_TRIGGERS, type]).map((t) => (
               <option key={t} value={t}>{TRIGGERS[t].label}</option>
             ))}
@@ -127,7 +127,7 @@ export function ConditionFields({ options, condition }: { options: EditorOptions
     <div className="space-y-4">
       <div className="space-y-1.5">
         <label htmlFor="condition-type" className="block text-small font-medium">Only when</label>
-        <select id="condition-type" name="conditionType" value={type} onChange={(e) => setType(e.target.value)} className="w-full rounded-control border border-line-strong bg-raised px-3 py-2.5 text-body">
+        <select id="condition-type" name="conditionType" value={type} onChange={(e) => setType(e.target.value)} className="w-full rounded-control border border-line-strong bg-raised px-3 py-2.5 text-body pointer-fine:py-1.5">
           <option value="none">Always (no condition)</option>
           <option value="deliverable_accepted">A deliverable has been accepted</option>
           <option value="delivered_before">A deliverable was delivered before a date</option>

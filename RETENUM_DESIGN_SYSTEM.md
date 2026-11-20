@@ -102,6 +102,17 @@ Base 16 px (inputs are never below 16 px, which prevents iOS zoom on focus). Rat
 
 ---
 
+### 3a. Density revision (20 Nov 2026, founder: "the visual of Linear")
+
+This supersedes the sizes above. Density follows Linear's principles; it does not copy Linear's brand.
+
+- **Desktop scale:** display 20/28, h2 16/24, h3 14/20, body 13/20, small 12/18, caption 11/16, figure-xl 24/32.
+- **Phones (< 48rem):** body 15/22, small 13/20, caption 12/16, h3 16, h2 18, display 22. 13 px is too small to read comfortably on a phone.
+- **Form fields on touch screens (`pointer: coarse`)** stay at 16 px so iOS doesn't zoom the page.
+- **Density by input device:** with a mouse (`pointer-fine:`), buttons are 32 px (small 28 px) and inputs 32–34 px. Touchscreens of any size keep 44 px targets. Every target is at least 24 px (WCAG 2.5.8).
+- **Sidebar:** 224 px; 32 px rows; 16 px icons; the active item is shown with a sunken background and medium weight, not a ring.
+- **Lines:** decorative dividers are lighter (light `#ebebeb`, dark `#262626`). Form-control borders keep `line-strong` for 3:1 non-text contrast.
+
 ## 4. Spacing, layout grid, radii, borders, elevation
 
 ### 4.1 Spacing (4 px base)

@@ -27,7 +27,7 @@ export function Canvas({ workflow, words, base, selected, options, editable }: {
       <Link
         href={href("trigger")}
         aria-current={selected === "trigger" ? "true" : undefined}
-        className={cn("block rounded-panel border bg-raised px-3 py-2", selected === "trigger" ? "border-fg ring-1 ring-fg" : "border-line hover:border-line-strong")}
+        className={cn("block rounded-panel border bg-raised px-3 py-2", selected === "trigger" ? "border-fg" : "border-line hover:border-line-strong")}
       >
         <p className="flex items-center gap-1.5 text-caption text-fg-muted"><TriggerIcon aria-hidden className="size-3.5" /> Trigger</p>
         <h2 className="font-semibold break-words">{triggerSentence(workflow, words)}</h2>
@@ -49,7 +49,7 @@ export function Canvas({ workflow, words, base, selected, options, editable }: {
               <Link
                 href={href(s.id)}
                 aria-current={selected === s.id ? "true" : undefined}
-                className={cn("flex gap-2.5 rounded-panel border bg-raised px-3 py-2", selected === s.id ? "border-fg ring-1 ring-fg" : "border-line hover:border-line-strong")}
+                className={cn("flex gap-2.5 rounded-panel border bg-raised px-3 py-2", selected === s.id ? "border-fg" : "border-line hover:border-line-strong")}
               >
                 <span aria-hidden className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-full border border-line-strong text-caption font-semibold tabular">{i + 1}</span>
                 <span className="min-w-0 flex-1">

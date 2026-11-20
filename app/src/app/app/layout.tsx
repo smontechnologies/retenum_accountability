@@ -23,17 +23,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!current && !(await isCounterpartyAnywhere(db, actor.userId))) redirect("/onboarding");
   const signOut = (
     <form action={signOutAction}>
-      <p className="truncate px-3 text-caption text-fg-muted" title={actor.email}>{actor.email}</p>
-      <button type="submit" className="mt-1 flex min-h-11 w-full items-center gap-3 rounded-control px-3 text-small text-fg-secondary hover:bg-raised hover:text-fg">
-        <LogOut aria-hidden className="size-5" /> Sign out
+      <p className="truncate px-2 text-caption text-fg-muted" title={actor.email}>{actor.email}</p>
+      <button type="submit" className="mt-1 flex min-h-8 w-full items-center gap-2.5 rounded-control px-2 text-small text-fg-secondary hover:bg-sunken/60 hover:text-fg">
+        <LogOut aria-hidden className="size-4" /> Sign out
       </button>
     </form>
   );
   return (
     <div className="min-h-dvh md:flex">
       <ThemeSync theme={theme} />
-      <aside className="sticky top-0 hidden h-dvh w-62 shrink-0 border-r border-line bg-surface p-4 lg:block">
-        <SideNav header={<div className="space-y-4"><Wordmark /><WorkspaceSwitcher current={current} workspaces={memberships} /></div>} footer={signOut} />
+      <aside className="sticky top-0 hidden h-dvh w-56 shrink-0 border-r border-line bg-surface px-2.5 py-3 lg:block">
+        <SideNav header={<div className="space-y-2.5 px-0.5"><Wordmark /><WorkspaceSwitcher current={current} workspaces={memberships} /></div>} footer={signOut} />
       </aside>
       <aside className="sticky top-0 hidden h-dvh w-18 shrink-0 border-r border-line bg-surface p-3 md:block lg:hidden">
         <SideNav compact header={<div className="flex justify-center"><Wordmark compact /></div>} />
@@ -43,7 +43,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <Wordmark />
           {current && <span className="max-w-[50%] truncate text-small text-fg-secondary">{current.name}</span>}
         </header>
-        <main id="main" className="mx-auto w-full max-w-[77.5rem] px-4 pt-6 pb-28 md:px-8 md:pt-10 md:pb-12">
+        <main id="main" className="mx-auto w-full max-w-[77.5rem] px-4 pt-5 pb-28 md:px-6 md:pt-6 md:pb-10">
           {children}
         </main>
       </div>

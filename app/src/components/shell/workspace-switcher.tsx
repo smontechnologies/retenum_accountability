@@ -9,7 +9,7 @@ export function WorkspaceSwitcher({ current, workspaces }: { current: { id: stri
   const form = useRef<HTMLFormElement>(null);
   if (!current) return null;
   if (workspaces.length < 2) {
-    return <p className="truncate rounded-control border border-line px-3 py-2 text-small font-medium" title={current.name}>{current.name}</p>;
+    return <p className="truncate rounded-control border border-line px-2.5 py-1.5 text-small font-medium" title={current.name}>{current.name}</p>;
   }
   return (
     <form ref={form} action={switchWorkspaceAction} className="relative">
@@ -19,7 +19,7 @@ export function WorkspaceSwitcher({ current, workspaces }: { current: { id: stri
         name="workspaceId"
         defaultValue={current.id}
         onChange={() => form.current?.requestSubmit()}
-        className="w-full appearance-none truncate rounded-control border border-line-strong bg-raised py-2 pr-8 pl-3 text-small font-medium"
+        className="w-full appearance-none truncate rounded-control border border-line-strong bg-raised py-1.5 pr-8 pl-2.5 text-small font-medium"
       >
         {workspaces.map((w) => (
           <option key={w.id} value={w.id}>{w.name}</option>

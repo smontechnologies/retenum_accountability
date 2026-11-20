@@ -9,13 +9,13 @@
 :root,
 [data-theme="light"] {
   --bg: #ffffff;
-  --surface: #f5f5f5;
+  --surface: #f7f7f7;
   --surface-raised: #ffffff;
   --surface-sunken: #ededed;
   --fg: #000000;
   --fg-secondary: #3d3d3d;
   --fg-muted: #666666;
-  --line: #e2e2e2;
+  --line: #ebebeb;
   --line-strong: #858585;
   --action: #000000;
   --action-fg: #ffffff;
@@ -35,7 +35,7 @@
   --fg: #ffffff;
   --fg-secondary: #c8c8c8;
   --fg-muted: #9c9c9c;
-  --line: #2b2b2b;
+  --line: #262626;
   --line-strong: #737373;
   --action: #ffffff;
   --action-fg: #000000;
@@ -56,7 +56,7 @@
     --fg: #ffffff;
     --fg-secondary: #c8c8c8;
     --fg-muted: #9c9c9c;
-    --line: #2b2b2b;
+    --line: #262626;
     --line-strong: #737373;
     --action: #ffffff;
     --action-fg: #000000;
@@ -93,20 +93,21 @@
   --radius-panel: 10px;
   --radius-overlay: 14px;
 
-  --text-figure-xl: 2rem;
-  --text-figure-xl--line-height: 2.25rem;
-  --text-display: 1.75rem;
-  --text-display--line-height: 2.125rem;
-  --text-h2: 1.375rem;
-  --text-h2--line-height: 1.75rem;
-  --text-h3: 1.125rem;
-  --text-h3--line-height: 1.5rem;
-  --text-body: 1rem;
-  --text-body--line-height: 1.5rem;
-  --text-small: 0.875rem;
-  --text-small--line-height: 1.25rem;
-  --text-caption: 0.8125rem;
-  --text-caption--line-height: 1.125rem;
+  /* Dense, Linear-like scale for desktop (13px body); phones get a roomier scale below. */
+  --text-figure-xl: 1.5rem;
+  --text-figure-xl--line-height: 2rem;
+  --text-display: 1.25rem;
+  --text-display--line-height: 1.75rem;
+  --text-h2: 1rem;
+  --text-h2--line-height: 1.5rem;
+  --text-h3: 0.875rem;
+  --text-h3--line-height: 1.25rem;
+  --text-body: 0.8125rem;
+  --text-body--line-height: 1.25rem;
+  --text-small: 0.75rem;
+  --text-small--line-height: 1.125rem;
+  --text-caption: 0.6875rem;
+  --text-caption--line-height: 1rem;
 }
 
 @theme inline {
@@ -128,7 +129,33 @@
   --shadow-overlay: var(--shadow-overlay);
 }
 
+/* Phones and small tablets: a roomier scale (13px is too small to read comfortably on a phone). */
+@media (max-width: 47.99rem) {
+  :root {
+    --text-display: 1.375rem;
+    --text-display--line-height: 1.75rem;
+    --text-h2: 1.125rem;
+    --text-h2--line-height: 1.5rem;
+    --text-h3: 1rem;
+    --text-h3--line-height: 1.375rem;
+    --text-body: 0.9375rem;
+    --text-body--line-height: 1.375rem;
+    --text-small: 0.8125rem;
+    --text-small--line-height: 1.25rem;
+    --text-caption: 0.75rem;
+    --text-caption--line-height: 1rem;
+  }
+}
+
 @layer base {
+  /* iOS zooms the page into any field under 16px: keep form fields at 16px on touch screens. */
+  @media (pointer: coarse) {
+    input:not([type="checkbox"]):not([type="radio"]),
+    select,
+    textarea {
+      font-size: 1rem;
+    }
+  }
   html {
     background: var(--bg);
     color: var(--fg);

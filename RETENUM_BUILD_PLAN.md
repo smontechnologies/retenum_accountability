@@ -534,3 +534,14 @@ A UI slice is only done when the design system §11 checklist passes: tokens and
   - `scroll-padding-top` for the sticky phone bar.
 - **Found by the design gate:** axe target-size flagged the active tab on mobile because the shorter header let scrolled-into-view elements sit under the sticky bar. Fixed in the app with scroll padding, not by relaxing the test.
 - **Tests run:** unit and integration 134/134; UJ-2 **passed on mobile and desktop** with the design gate (light and dark, 320 px overflow).
+
+### Linear-style density (20 Nov 2026, founder request)
+
+- **Built:**
+  - a dense desktop type scale (13 px body) and a roomier phone scale;
+  - 16 px form fields on touch screens;
+  - mouse-only compact buttons and inputs (`pointer-fine:`);
+  - a 224 px sidebar with 32 px rows and a subtle active state;
+  - lighter decorative dividers;
+  - a thinner selected-card outline.
+- **Tests run:** full e2e suite **23 passed, 7 skipped by design**, including axe WCAG 2.2 AA in light and dark on every app page and overflow at 320–1536 px.
