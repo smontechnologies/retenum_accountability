@@ -96,9 +96,10 @@ describe("creating drafts (FR-ENG-01..03, FR-WS-07, FR-ENG-12)", () => {
     expect((err.details as { fields: Record<string, string> }).fields.counterpartyEmail).toMatch(/not your own/);
   });
 
-  it("enforces the plan's active-engagement limit (drafts count) with a clear reason", async () => {
-    const { actor, workspaceId } = await payeeWithWorkspace("limit", "free");
-    await createDraft(db, actor, { workspaceId, title: "One", initiatorSide: "payee", counterpartyOrg: "A", counterpartyName: "A", counterpartyEmail: "a@a.ng" });
+  it("still enforces a plan's active-engagement limit (drafts count) with a clear reason", async () => {
+    // Free is unlimited for now (D-68); the mechanism stays, checked on Pro (10).
+    const { actor, workspaceId } = await payeeWithWorkspace("limit", "pro");
+    for (let i = 0; i < 10; i++) await createDraft(db, actor, { workspaceId, title: `J${i}`, initiatorSide: "payee", counterpartyOrg: "A", counterpartyName: "A", counterpartyEmail: `a${i}@a.ng` });
     const err = await code(createDraft(db, actor, { workspaceId, title: "Two", initiatorSide: "payee", counterpartyOrg: "B", counterpartyName: "B", counterpartyEmail: "b@b.ng" }));
     expect(err.details).toEqual({ reason: "plan_limit" });
   });
@@ -190,6 +191,16 @@ describe("workflows: building the agreement (D-66, FR-WF-01…06, FR-ENG-12)", (
     expect((await code(addStep(db, actor, id, main, "notify", { who: "both" }))).code).toBe("CONFLICT");
     expect((await code(moveStep(db, actor, id, conceptsStep, "down"))).code).toBe("CONFLICT");
     expect((await code(addWorkflow(db, actor, id, { triggerType: "change_confirmed" }))).code).toBe("CONFLICT");
+  });
+});
+
+describe("free plan (D-68)", () => {
+  it("lets a free workspace create as many engagements as it needs", async () => {
+    const { actor, workspaceId } = await payeeWithWorkspace("unlimited", "free");
+    for (let i = 0; i < 4; i++) {
+      await createDraft(db, actor, { workspaceId, title: `Job ${i}`, initiatorSide: "payee", counterpartyOrg: "C", counterpartyName: "C", counterpartyEmail: `c${i}@c.ng` });
+    }
+    expect(await listEngagementsForActor(db, actor, workspaceId)).toHaveLength(4);
   });
 });
 
