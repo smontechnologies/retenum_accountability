@@ -102,7 +102,7 @@ export default async function WorkflowEditorPage(props: { params: Promise<{ id: 
             {v.problems.length} {v.problems.length === 1 ? "thing" : "things"} to fix before sending
             <ChevronDown aria-hidden className="ml-auto size-4 transition-transform group-open:rotate-180" />
           </summary>
-          <ul className="mt-1 mb-1 list-disc space-y-0.5 pl-8 text-fg-secondary">{v.problems.map((p) => <li key={p}>{p}</li>)}</ul>
+          <ul className="mt-1 mb-1 list-disc space-y-0.5 pl-8 text-fg-secondary">{v.problems.map((p, i) => <li key={i}>{p}</li>)}</ul>
         </details>
       )}
       {v.status === "draft" && v.viewer.isInitiatorSide && v.problems.length === 0 && (

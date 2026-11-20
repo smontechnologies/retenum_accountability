@@ -280,13 +280,13 @@ export function sendProblems(workflows: WorkflowView[], ctx: SentenceContext): s
     }
     if (needs === "date" && !w.triggerParams.date && !w.triggerParams.afterDays) problems.push(`Workflow ${q(name)} needs a date.`);
     if (needs === "workflow" && !(w.triggerParams.workflowId && ctx.workflows.has(w.triggerParams.workflowId))) problems.push(`Workflow ${q(name)} needs another workflow to follow.`);
-    for (const s of w.steps) {
+    w.steps.forEach((s, i) => {
       const target = s.params.commitmentId;
       if ((s.actionType === "require_evidence" || s.actionType === "request_payment" || s.actionType === "ask_to_accept") && !(target && ctx.commitments.has(target))) {
-        problems.push(`A step in ${q(name)} needs you to choose what it applies to.`);
+        problems.push(`Step ${i + 1} in ${q(name)} needs you to choose what it applies to.`);
       }
-      if (s.actionType === "unlock_workflow" && !(s.params.workflowId && ctx.workflows.has(s.params.workflowId))) problems.push(`A step in ${q(name)} needs a workflow to start.`);
-    }
+      if (s.actionType === "unlock_workflow" && !(s.params.workflowId && ctx.workflows.has(s.params.workflowId))) problems.push(`Step ${i + 1} in ${q(name)} needs a workflow to start.`);
+    });
   }
   return problems;
 }

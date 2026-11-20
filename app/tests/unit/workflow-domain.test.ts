@@ -119,7 +119,7 @@ describe("send rules (FR-ENG-12)", () => {
     const loose: WorkflowView = { id: "l", position: 3, triggerType: "deliverable_accepted", triggerParams: {}, onlyWhen: null, steps: [step({ id: "s9", actionType: "request_payment" })] };
     const problems = sendProblems([w1, loose], ctx([w1, loose]));
     expect(problems).toContain("Workflow “When “(not chosen)” is accepted” needs you to choose what it watches.");
-    expect(problems).toContain("A step in “When “(not chosen)” is accepted” needs you to choose what it applies to.");
+    expect(problems).toContain("Step 1 in “When “(not chosen)” is accepted” needs you to choose what it applies to.");
   });
   it("refuses conditions that would decide whether money is owed (D-67)", () => {
     const risky: WorkflowView = { ...w2, steps: [step({ id: "s5", actionType: "make_payment_due", commitment: balance, onlyWhen: { type: "days_since_trigger", op: "less", days: 30 } })] };

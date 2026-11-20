@@ -78,7 +78,7 @@ export default async function AgreementPage(props: { params: Promise<{ id: strin
                 <span className="font-semibold tabular">{c.number}.</span>
                 <div className="min-w-0">
                   <p className="font-semibold break-words">{c.text}</p>
-                  <ul className="mt-1.5 space-y-1">{c.lines.map((l) => <li key={l} className="text-body break-words">{l}</li>)}</ul>
+                  <ul className="mt-1.5 space-y-1">{c.lines.map((l, i) => <li key={i} className="text-body break-words">{l}</li>)}</ul>
                 </div>
               </li>
             ))}
@@ -95,8 +95,8 @@ export default async function AgreementPage(props: { params: Promise<{ id: strin
               { label: "Unscheduled", value: <MoneyFigure amountMinor={v.summary.unscheduledMinor} /> },
             ]}
           />
-          {warnings.map((m) => (
-            <p key={m} className="mt-3 text-small text-fg-secondary">{m}</p>
+          {warnings.map((m, i) => (
+            <p key={i} className="mt-3 text-small text-fg-secondary">{m}</p>
           ))}
         </Panel>
         <Panel title="Response times" description="Working days each side has to respond. Silence is recorded as no response, never as acceptance.">
@@ -129,8 +129,8 @@ export default async function AgreementPage(props: { params: Promise<{ id: strin
             <div className="space-y-4">
               <Alert tone="warning" title="Before you can send this">
                 <ul className="mt-1 list-disc space-y-0.5 pl-5">
-                  {v.problems.map((p) => (
-                    <li key={p}>{p}</li>
+                  {v.problems.map((p, i) => (
+                    <li key={i}>{p}</li>
                   ))}
                 </ul>
               </Alert>
